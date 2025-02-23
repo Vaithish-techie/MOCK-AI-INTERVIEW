@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Interview Assistant</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <!-- Sidebar for a more professional, minimal look -->
+  <div class="sidebar">
+    <h2 class="logo">MOCK AI INTERVIEW</h2>
+    <ul class="nav-links">
+      <li><a href="#" onclick="showScreen('dashboard')">Dashboard</a></li>
+      <li><a href="#" onclick="showScreen('round1')">Round 1 (MCQs)</a></li>
+      <li><a href="#" onclick="showScreen('round2')">Round 2 (Coding)</a></li>
+      <li><a href="#" onclick="showScreen('results')">Results</a></li>
+    </ul>
+  </div>
+
+  <!-- Main content area -->
+  <div class="main-content">
+    <!-- Dashboard Screen -->
+    <div id="dashboard" class="screen active">
+      <h1>Dashboard</h1>
+      <p>Welcome to your AI Interview Assistant. You can begin your interview below.</p>
+      <button class="btn" onclick="showScreen('round1')">Start Interview</button>
+    </div>
+
+    <!-- Round 1: MCQs -->
+    <div id="round1" class="screen">
+      <h1>Round 1: Technical MCQs</h1>
+      <div class="progress-bar">
+        <span id="mcq-progress">0 / 0 Answered</span>
+      </div>
+      <div id="mcq-container">
+        <p>Loading MCQs...</p>
+      </div>
+      <div id="mcq-error" class="error"></div>
+      <button class="btn" onclick="submitMCQs()">Submit Answers</button>
+      <button class="btn" onclick="showScreen('round2')">Skip to Coding Round</button>
+    </div>
+<!-- Round 2: Two Distinct Challenges -->
+<div id="round2" class="screen">
+    <h1>Round 2: Coding Challenge</h1>
+    
+    <!-- Button to fetch 2 balanced challenges -->
+    <button class="btn" onclick="fetchBalancedChallenges()">Load 2 Challenges</button>
+    
+    <!-- Challenge #1 Container -->
+    <div class="challenge-container" id="challenge-1-container">
+      <!-- Left side: Question & Buttons -->
+      <div class="left-col">
+        <div class="question-card" id="question-1-card">
+          <h3>Problem #1</h3>
+          <p>(Waiting to load...)</p>
+        </div>
+        <div class="buttons-row">
+          <button class="small-btn" onclick="runCode(1)">Run Code</button>
+          <button class="small-btn" onclick="toggleAnalysis(1)">AI Analysis</button>
+        </div>
+        <div class="expansion-block" id="output-block-1">
+          <h4>Output</h4>
+          <div id="execution-result-1"></div>
+        </div>
+        <div class="expansion-block" id="analysis-block-1">
+          <h4>AI Analysis</h4>
+          <div id="analysis-result-1"></div>
+        </div>
+      </div>
+      <!-- Right side: Big code editor -->
+      <div class="right-col">
+        <label for="language-select-1">Language:</label>
+        <select id="language-select-1">
+          <option value="python">Python</option>
+          <option value="cpp">C++</option>
+          <option value="java">Java</option>
+        </select>
+        <textarea id="code-input-1" placeholder="Write your code here..."></textarea>
+      </div>
+    </div>
+  
+    <!-- Challenge #2 Container -->
+    <div class="challenge-container" id="challenge-2-container">
+      <!-- Left side: Question & Buttons -->
+      <div class="left-col">
+        <div class="question-card" id="question-2-card">
+          <h3>Problem #2</h3>
+          <p>(Waiting to load...)</p>
+        </div>
+        <div class="buttons-row">
+          <button class="small-btn" onclick="runCode(2)">Run Code</button>
+          <button class="small-btn" onclick="toggleAnalysis(2)">AI Analysis</button>
+        </div>
+        <div class="expansion-block" id="output-block-2">
+          <h4>Output</h4>
+          <div id="execution-result-2"></div>
+        </div>
+        <div class="expansion-block" id="analysis-block-2">
+          <h4>AI Analysis</h4>
+          <div id="analysis-result-2"></div>
+        </div>
+      </div>
+      <!-- Right side: Big code editor -->
+      <div class="right-col">
+        <label for="language-select-2">Language:</label>
+        <select id="language-select-2">
+          <option value="python">Python</option>
+          <option value="cpp">C++</option>
+          <option value="java">Java</option>
+        </select>
+        <textarea id="code-input-2" placeholder="Write your code here..."></textarea>
+      </div>
+    </div>
+    
+    <button class="btn" onclick="showScreen('results')">Finish Interview</button>
+  </div>  
+    <!-- Final Report Screen -->
+    <div id="results" class="screen">
+      <h1>Final Report</h1>
+      <div id="final-report" class="result-box">
+        <p>Loading final report...</p>
+      </div>
+      <button class="btn" onclick="restartInterview()">Restart Interview</button>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

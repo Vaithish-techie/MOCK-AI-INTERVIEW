@@ -1,0 +1,37 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+Lib/
+Scripts/
+Include/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Logs and local environment
+*.log
+*.sqlite3
+instance/
+.env
+
+# Node modules (if any Node-based front-end tasks)
+node_modules/
+
+# Coverage/test artifacts
+.coverage
+htmlcov/
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Virtual environment configuration file
+pyvenv.cfg
