@@ -1,36 +1,61 @@
-// script.js
-
+/*******************************************************
+ * GLOBALS
+ *******************************************************/
 let totalMCQs = 0;
 let answeredCount = 0;
+window.twoChallenges = [];
 
-// For storing coding challenges fetched from DB
-window.codingChallenges = [];
-
+/*******************************************************
+ * 1) Screen Navigation
+ *******************************************************/
 function showScreen(id) {
   const screens = document.querySelectorAll(".screen");
-  screens.forEach(screen => screen.classList.remove("active"));
+  screens.forEach(scr => scr.classList.remove("active"));
   document.getElementById(id).classList.add("active");
 
   if (id === "round1") {
     fetchMCQs();
+  } else if (id === "round2_challenge1") {
+    // Load challenges if not already loaded
+    if (window.twoChallenges.length === 0) {
+      fetchBalancedChallenges();
+    } else {
+      initiateChatConversation(1);
+    }
+  } else if (id === "round2_challenge2") {
+    // Ensure challenges are loaded and initiate chatbot for Challenge 2
+    if (window.twoChallenges.length === 0) {
+      fetchBalancedChallenges();
+    } else {
+      initiateChatConversation(2);
+    }
+  } else if (id === "results") {
+    fetchFinalReport();
   }
 }
 
 function restartInterview() {
-  location.reload();
+  showScreen("dashboard");
+  window.twoChallenges = [];
+  sessionStorage.clear(); // Clear sessionStorage to reset scores
 }
 
-// ------------------ ROUND 1: MCQs ------------------
+/*******************************************************
+ * 2) Round 1: MCQs
+ *******************************************************/
 async function fetchMCQs() {
   try {
     const response = await fetch("/api/get_general_qs");
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
     const data = await response.json();
     const container = document.getElementById("mcq-container");
     const progressLabel = document.getElementById("mcq-progress");
-    container.innerHTML = ""; // Clear previous content
+    container.innerHTML = "";
 
     if (data.error) {
-      container.innerHTML = `<p class="error">${data.error}</p>`;
+      document.getElementById("mcq-error").innerText = data.error || "Failed to fetch MCQs. Please try again.";
       return;
     }
 
@@ -50,14 +75,13 @@ async function fetchMCQs() {
       `;
     });
 
-    // Add change event listeners to all radio buttons
     const allRadios = container.querySelectorAll('input[type="radio"]');
     allRadios.forEach(radio => {
       radio.addEventListener("change", updateAnsweredCount);
     });
   } catch (error) {
-    console.error(error);
-    document.getElementById("mcq-error").innerText = "Error fetching MCQs";
+    console.error("Fetch MCQs error:", error);
+    document.getElementById("mcq-error").innerText = `Error fetching MCQs: ${error.message || "Unknown error. Please try again."}`;
   }
 }
 
@@ -99,68 +123,84 @@ async function submitMCQs() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ answers })
     });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
     const data = await response.json();
     if (data.error) {
       document.getElementById("mcq-error").innerText = data.error;
     } else {
-      alert(`Round 1 Score: ${data.round1_score}/5`);
-      showScreen("round2");
+      alert(`Round 1 Score: ${data.round1_score}/${totalMCQs}`);
+      console.log("MCQ Score:", data.round1_score);
+      sessionStorage.setItem("mcq_score", data.round1_score);
+      showScreen("round2_challenge1"); // Navigate to Round 2 (Challenge 1) after submitting MCQs
     }
   } catch (error) {
-    console.error(error);
-    document.getElementById("mcq-error").innerText = "Error submitting MCQs";
+    console.error("Submit MCQs error:", error);
+    document.getElementById("mcq-error").innerText = `Error submitting MCQs: ${error.message || "Unknown error. Please try again."}`;
   }
 }
 
-// ------------------ ROUND 2: Coding Challenge ------------------
-// We'll store the two challenges in an array
-window.twoChallenges = [];
-
+/*******************************************************
+ * 3) Round 2: Coding + Chat
+ *******************************************************/
 async function fetchBalancedChallenges() {
   try {
+    // Clear previous conversation histories
+    const clearResponse = await fetch("/api/clear_conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!clearResponse.ok) {
+      console.error("Failed to clear conversations:", clearResponse.status);
+    }
+
     const resp = await fetch("/api/balanced_coding_challenges");
+    if (!resp.ok) {
+      throw new Error(`HTTP error! Status: ${resp.status}`);
+    }
     const data = await resp.json();
     if (data.error) {
-      alert(data.error);
+      alert(data.error || "Failed to fetch challenges. Please try again.");
       return;
     }
     const challenges = data.challenges || [];
     if (challenges.length < 2) {
-      alert("Could not fetch two challenges.");
+      alert("Could not fetch two challenges. Please try again.");
       return;
     }
     window.twoChallenges = challenges;
     fillChallenge(1, challenges[0]);
     fillChallenge(2, challenges[1]);
+    initiateChatConversation(1); // Initiate chatbot for Challenge 1
   } catch (error) {
-    console.error(error);
-    alert("Error fetching challenges");
+    console.error("Fetch challenges error:", error);
+    alert(`Error fetching challenges: ${error.message || "Unknown error. Please try again."}`);
   }
 }
 
-/**
- * Fills the question card for challenge #1 or #2
- */
 function fillChallenge(index, challenge) {
   const questionCard = document.getElementById(`question-${index}-card`);
+  if (!questionCard) return;
   questionCard.innerHTML = `
-    <h3>Problem #${index}: ${challenge.title} (${challenge.difficulty})</h3>
+    <h3>Challenge ${index} of 2: ${challenge.title} (${challenge.difficulty})</h3>
     <p>${challenge.description}</p>
     <p><strong>Sample Input:</strong> ${challenge.sample_input}</p>
     <p><strong>Sample Output:</strong> ${challenge.sample_output}</p>
   `;
+  // Add event listener for Enter key on chat input
+  document.getElementById(`chat-input-${index}`).addEventListener("keypress", function(e) {
+    if (e.key === "Enter") sendChatMessage(index);
+  });
 }
 
-/**
- * Runs code for challenge #1 or #2
- */
 async function runCode(index) {
   const codeInput = document.getElementById(`code-input-${index}`);
   const langSelect = document.getElementById(`language-select-${index}`);
   const outputBlock = document.getElementById(`output-block-${index}`);
   const resultDiv = document.getElementById(`execution-result-${index}`);
 
-  const code = codeInput.value;
+  const code = codeInput.value.trim();
   const language = langSelect.value;
 
   try {
@@ -169,83 +209,284 @@ async function runCode(index) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, language })
     });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
     const data = await response.json();
-    // Show the output block
     outputBlock.style.display = "block";
     resultDiv.innerHTML = `
       <p><strong>Output:</strong> ${data.output || "No output"}</p>
       <p><strong>Error:</strong> ${data.error || "No error"}</p>
       <p><strong>Execution Time:</strong> ${data.execution_time || "N/A"}</p>
     `;
-  } catch (error) {
-    console.error(error);
-    outputBlock.style.display = "block";
-    resultDiv.innerHTML = `<p class="error">Error executing code</p>`;
-  }
-}
-
-/**
- * Toggles AI analysis for challenge #1 or #2
- * and calls /api/analyze_code with the code from the editor
- */
-async function toggleAnalysis(index) {
-  const analysisBlock = document.getElementById(`analysis-block-${index}`);
-  const analysisResult = document.getElementById(`analysis-result-${index}`);
-  const codeInput = document.getElementById(`code-input-${index}`).value;
-
-  // If hidden, show it and do the AI call
-  const isVisible = (analysisBlock.style.display === "block");
-  if (!isVisible) {
-    analysisBlock.style.display = "block";
-    // call AI
-    try {
-      const response = await fetch("/api/analyze_code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: codeInput })
-      });
-      const data = await response.json();
-      if (data.error) {
-        analysisResult.innerHTML = `<p class="error">${data.error}</p>`;
-      } else {
-        analysisResult.innerHTML = `<p><strong>Analysis:</strong> ${data.analysis}</p>`;
-      }
-    } catch (error) {
-      console.error(error);
-      analysisResult.innerHTML = `<p class="error">Error analyzing code</p>`;
+    // Increment errors if there's an error in the output
+    if (data.error) {
+      sessionStorage.setItem("performance", JSON.stringify({
+        ...JSON.parse(sessionStorage.getItem("performance") || "{}"),
+        errors: (JSON.parse(sessionStorage.getItem("performance") || "{}").errors || 0) + 1
+      }));
     }
-  } else {
-    // Hide it if already visible
-    analysisBlock.style.display = "none";
+    // Trigger chatbot feedback after running code
+    const challengeContext = buildChallengeContext(index);
+    autoChatAfterRun(data.output || data.error || "No output", challengeContext, index);
+  } catch (error) {
+    console.error("Run code error:", error);
+    outputBlock.style.display = "block";
+    resultDiv.innerHTML = `<p class="error">Error executing code: ${error.message || "Unknown error. Please try again."}</p>`;
+    // Increment errors on failed execution
+    sessionStorage.setItem("performance", JSON.stringify({
+      ...JSON.parse(sessionStorage.getItem("performance") || "{}"),
+      errors: (JSON.parse(sessionStorage.getItem("performance") || "{}").errors || 0) + 1
+    }));
   }
 }
 
-// ------------------ FINAL REPORT ------------------
+async function analyzeCode(index) {
+  const analyzeBtn = document.getElementById(`analyze-btn-${index}`);
+  analyzeBtn.disabled = true;
+  analyzeBtn.textContent = "Analyzing...";
+  const code = document.getElementById(`code-input-${index}`).value.trim();
+  if (!code) {
+    alert("Please write some code to analyze!");
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = "AI Analysis";
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/analyze_code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code })
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    const data = await response.json();
+    if (data.error) {
+      addChatMessage("Sorry, I couldn’t analyze the code: " + data.error, "bot", `chat-box-${index}`);
+    } else {
+      addChatMessage(data.analysis, "bot", `chat-box-${index}`);
+    }
+  } catch (error) {
+    console.error("Analysis error:", error);
+    addChatMessage(`Sorry, I couldn’t analyze the code: ${error.message || "Unknown error. Please try again."}`, "bot", `chat-box-${index}`);
+  }
+  analyzeBtn.disabled = false;
+  analyzeBtn.textContent = "AI Analysis";
+}
+
+async function submitCode(index) {
+  const submitBtn = document.getElementById(`submit-btn-${index}`);
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Submitting...";
+  const code = document.getElementById(`code-input-${index}`).value.trim();
+  const lang = document.getElementById(`language-select-${index}`).value;
+  try {
+    const response = await fetch("/api/submit_code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, language: lang })
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    const data = await response.json();
+    if (data.error) {
+      alert(`Error: ${data.error}`);
+      // Increment errors on failed submission
+      sessionStorage.setItem("performance", JSON.stringify({
+        ...JSON.parse(sessionStorage.getItem("performance") || "{}"),
+        errors: (JSON.parse(sessionStorage.getItem("performance") || "{}").errors || 0) + 1
+      }));
+    } else {
+      alert(data.output || "Submitted successfully!");
+      sessionStorage.setItem(`coding_score_${index}`, "4"); // 4 points per challenge
+      console.log(`Coding Score for Challenge ${index}:`, sessionStorage.getItem(`coding_score_${index}`));
+      // Navigate based on which challenge was submitted
+      if (index === 1) {
+        showScreen("round2_challenge2");
+      } else if (index === 2) {
+        const codingScore = (parseInt(sessionStorage.getItem("coding_score_1") || 0) + 
+                            parseInt(sessionStorage.getItem("coding_score_2") || 0));
+        sessionStorage.setItem("coding_score", codingScore.toString());
+        console.log("Total Coding Score:", codingScore);
+        showScreen("results");
+      }
+    }
+  } catch (error) {
+    console.error("Submit code error:", error);
+    alert(`Submission failed: ${error.message || "Unknown error. Please check your API key or network connection."}`);
+    // Increment errors on failed submission
+    sessionStorage.setItem("performance", JSON.stringify({
+      ...JSON.parse(sessionStorage.getItem("performance") || "{}"),
+      errors: (JSON.parse(sessionStorage.getItem("performance") || "{}").errors || 0) + 1
+    }));
+  }
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Submit";
+}
+
+function addChatMessage(text, sender, chatBoxId) {
+  const chatBox = document.getElementById(chatBoxId);
+  if (!chatBox) return;
+  const msgDiv = document.createElement("div");
+  msgDiv.classList.add("message", sender);
+  msgDiv.textContent = text;
+  chatBox.appendChild(msgDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function clearChat(chatBoxId) {
+  const chatBox = document.getElementById(chatBoxId);
+  if (chatBox) chatBox.innerHTML = "";
+}
+
+async function initiateChatConversation(index) {
+  const challenge = window.twoChallenges[index - 1];
+  const challengeContext = challenge ?
+    `Challenge ${index} of 2: ${challenge.title} - ${challenge.description}\nSample Input: ${challenge.sample_input}\nSample Output: ${challenge.sample_output}` :
+    "No challenge context available";
+  try {
+    const response = await fetch("/api/message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Start the coding challenge interview.",
+        challenge_context: challengeContext,
+        challenge_id: index
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    const data = await response.json();
+    addChatMessage(data.response, "bot", `chat-box-${index}`);
+    // Follow up with "How can I help?"
+    setTimeout(() => {
+      addChatMessage("How can I help you with this challenge? For example, would you like a hint to get started?", "bot", `chat-box-${index}`);
+    }, 1000);
+  } catch (error) {
+    console.error("Chat error:", error);
+    addChatMessage(`Sorry, I couldn’t start the conversation: ${error.message || "Unknown error. Please try again."}`, "bot", `chat-box-${index}`);
+  }
+}
+
+async function autoChatAfterRun(runResult, challengeContext, index) {
+  try {
+    const response = await fetch("/api/message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `The code execution result is: ${runResult}. Provide feedback and ask if the user needs further assistance.`,
+        challenge_context: challengeContext,
+        challenge_id: index
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    const data = await response.json();
+    addChatMessage(data.response, "bot", `chat-box-${index}`);
+  } catch (error) {
+    console.error("Chat error:", error);
+    addChatMessage(`I couldn’t analyze the run result: ${error.message || "Unknown error. Please try again."}`, "bot", `chat-box-${index}`);
+  }
+}
+
+async function sendChatMessage(index) {
+  const inputField = document.getElementById(`chat-input-${index}`);
+  const sendBtn = document.getElementById(`round2-send-btn-${index}`);
+  const message = inputField.value.trim();
+  if (!message) return;
+
+  addChatMessage(message, "user", `chat-box-${index}`);
+  inputField.value = "";
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Thinking...";
+
+  const challenge = window.twoChallenges[index - 1];
+  const challengeContext = challenge ?
+    `Challenge ${index} of 2: ${challenge.title} - ${challenge.description}\nSample Input: ${challenge.sample_input}\nSample Output: ${challenge.sample_output}` :
+    "No challenge context available";
+
+  try {
+    const response = await fetch("/api/message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Technical: " + message,
+        challenge_context: challengeContext,
+        challenge_id: index
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    const data = await response.json();
+    addChatMessage(data.response, "bot", `chat-box-${index}`);
+  } catch (error) {
+    console.error("Chat error:", error);
+    addChatMessage(`Sorry, something went wrong: ${error.message || "Unknown error. Please try again."}`, "bot", `chat-box-${index}`);
+  }
+  sendBtn.disabled = false;
+  sendBtn.textContent = "Send";
+}
+
+function buildChallengeContext(index) {
+  const challenge = window.twoChallenges[index - 1];
+  if (!challenge) return "No challenge context";
+  return `Title: ${challenge.title}\nDescription: ${challenge.description}\nSample Input: ${challenge.sample_input}\nSample Output: ${challenge.sample_output}`;
+}
+
+/*******************************************************
+ * 4) Results
+ *******************************************************/
 async function fetchFinalReport() {
   try {
     const response = await fetch("/api/final_report");
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
     const data = await response.json();
     const finalDiv = document.getElementById("final-report");
 
     if (data.error) {
-      finalDiv.innerHTML = `<p class="error">${data.error}</p>`;
+      finalDiv.innerHTML = `<p class="error">${data.error || "Failed to fetch final report. Please try again."}</p>`;
       return;
     }
     finalDiv.innerHTML = `
-      <p><strong>Overall Score:</strong> ${data.overall_score}/10</p>
+      <p><strong>Overall Score:</strong> ${data.overall_score}/30</p>
       <p><strong>Time Limit:</strong> ${data.time_limit}</p>
       <h3>Category Scores</h3>
       <ul>
-        ${Object.entries(data.category_scores).map(([cat, val]) => `<li><strong>${cat}:</strong> ${val}</li>`).join("")}
+        <li><strong>MCQs:</strong> ${data.category_scores.MCQs}</li>
+        <li><strong>Coding:</strong> ${data.category_scores.Coding}</li>
+        <li><strong>Behavioral:</strong> ${data.category_scores.Behavioral}</li>
       </ul>
-      <p><strong>Feedback:</strong> ${data.feedback}</p>
-      <h4>Transcript</h4>
-      <div>
-        ${data.transcript.map(t => `<p><strong>${t.speaker}:</strong> ${t.message}</p>`).join("")}
-      </div>
+      <p><strong>Badges:</strong> ${data.badges.join(", ") || "None"}</p>
+      <p><strong>Feedback:</strong> ${data.message}</p>
+      <h4>Behavioral Feedback</h4>
+      <ul>
+        ${data.behavioral_feedback.map(f => `<li>${f}</li>`).join("")}
+      </ul>
+      ${data.transcript && data.transcript.length > 0 ? `
+        <h4>Transcript</h4>
+        <div>
+          ${data.transcript.map(t => `<p><strong>${t.speaker}:</strong> ${t.message}</p>`).join("")}
+        </div>
+      ` : ""}
     `;
   } catch (error) {
-    console.error(error);
-    document.getElementById("final-report").innerText = "Error fetching final report";
+    console.error("Fetch final report error:", error);
+    document.getElementById("final-report").innerText = `Error fetching final report: ${error.message || "Unknown error. Please try again."}`;
   }
+}
+
+/*******************************************************
+ * 5) Sidebar Toggle
+ *******************************************************/
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  sidebar.classList.toggle("collapsed");
 }
