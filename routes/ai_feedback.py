@@ -1,7 +1,9 @@
-# routes/ai_feedback.py
 from flask import Blueprint, request, jsonify
-import openai
-import config
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+
+# Import model and tokenizer from chat.py to reuse
+from routes.chat import model, tokenizer
 
 ai_feedback_bp = Blueprint("ai_feedback", __name__)
 
@@ -9,18 +11,28 @@ ai_feedback_bp = Blueprint("ai_feedback", __name__)
 def analyze_code():
     data = request.json
     code = data.get("code")
-    
     if not code:
         return jsonify({"error": "No code provided"}), 400
 
-    openai.api_key = config.OPENAI_API_KEY
-
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # or "gpt-4" if available
-            messages=[{"role": "system", "content": "Analyze this code for efficiency and readability:\n" + code}]
+        prompt = (
+            "You are an expert coding assistant. Analyze the provided code for correctness, efficiency, style, and potential improvements. "
+            "Do not execute the code, but provide detailed feedback including time complexity if applicable. Be clear and concise.\n\n"
+            f"Code to Analyze:\n```python\n{code}\n```\n"
         )
-        analysis = response["choices"][0]["message"]["content"]
+
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024).to(device)
+        with torch.inference_mode():
+            outputs = model.generate(
+                inputs["input_ids"],
+                max_new_tokens=200,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.9,
+                repetition_penalty=1.1
+            )
+        analysis = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
         return jsonify({"analysis": analysis})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Failed to analyze code: {str(e)}"}), 500
