@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify
 from models import GeneralQuestion, CodingQuestion
-from extensions import db  # Import db from extensions
+from extensions import db
 
 database_bp = Blueprint("database", __name__)
 
@@ -23,7 +23,7 @@ def get_random_coding_question():
             "title": question.title,
             "description": question.description,
             "difficulty": question.difficulty,
-            "sample_input": question.sample_input,
-            "sample_output": question.sample_output
+            "sample_input": question.sample_input if question.sample_input else "N/A",
+            "sample_output": question.sample_output if question.sample_output else "N/A"
         })
     return jsonify({"error": "No coding questions found"}), 404

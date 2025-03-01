@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>AI Interview Assistant (Single Page with Chat)</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <!-- Include Chart.js for graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <!-- Sidebar -->
@@ -133,7 +135,41 @@
     <div id="results" class="screen">
       <h1>Final Report</h1>
       <div id="final-report" class="result-box">
-        <p>Loading final report...</p>
+        <!-- Overall Score and Progress Bar -->
+        <div class="score-section">
+          <p><strong>Overall Score:</strong> <span id="overall-score">0/30</span></p>
+          <div class="progress-bar">
+            <div id="overall-progress" class="progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Category Scores with Bar Chart -->
+        <h3>Category Scores</h3>
+        <canvas id="category-scores-chart" width="400" height="200"></canvas>
+
+        <!-- Performance Metrics with Radar Chart -->
+        <h3>Performance Metrics</h3>
+        <canvas id="performance-metrics-chart" width="400" height="300"></canvas>
+
+        <!-- Badges Section -->
+        <h3>Your Achievements</h3>
+        <div id="badges-section" class="badges-container"></div>
+
+        <!-- AI-Driven Analysis -->
+        <h3>Performance Analysis</h3>
+        <div id="ai-analysis">
+          <p>Loading AI analysis...</p>
+        </div>
+
+        <!-- Leaderboard -->
+        <h3>Leaderboard</h3>
+        <ul id="leaderboard" class="leaderboard"></ul>
+
+        <!-- Transcript (Optional) -->
+        <div id="transcript-section">
+          <h4>Transcript</h4>
+          <div id="transcript-content"></div>
+        </div>
       </div>
       <button class="btn" onclick="restartInterview()">Restart Interview</button>
     </div>

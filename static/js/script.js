@@ -127,13 +127,16 @@ async function submitMCQs() {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     const data = await response.json();
+    console.log("Submit MCQs response:", data); // Debug log
     if (data.error) {
       document.getElementById("mcq-error").innerText = data.error;
     } else {
-      alert(`Round 1 Score: ${data.round1_score}/${totalMCQs}`);
-      console.log("MCQ Score:", data.round1_score);
-      sessionStorage.setItem("mcq_score", data.round1_score);
-      showScreen("round2_challenge1"); // Navigate to Round 2 (Challenge 1) after submitting MCQs
+      const totalQuestions = data.total_questions !== undefined ? data.total_questions : totalMCQs;
+      alert(`Round 1 Score: ${data.round1_score}/${totalQuestions}`);
+      console.log("MCQ Score (raw):", data.round1_score);
+      console.log("MCQ Score (normalized):", data.normalized_score);
+      sessionStorage.setItem("mcq_score", data.normalized_score.toString()); // Ensure it's a string
+      showScreen("round2_challenge1");
     }
   } catch (error) {
     console.error("Submit MCQs error:", error);
@@ -146,7 +149,6 @@ async function submitMCQs() {
  *******************************************************/
 async function fetchBalancedChallenges() {
   try {
-    // Clear previous conversation histories
     const clearResponse = await fetch("/api/clear_conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" }
@@ -172,7 +174,7 @@ async function fetchBalancedChallenges() {
     window.twoChallenges = challenges;
     fillChallenge(1, challenges[0]);
     fillChallenge(2, challenges[1]);
-    initiateChatConversation(1); // Initiate chatbot for Challenge 1
+    initiateChatConversation(1);
   } catch (error) {
     console.error("Fetch challenges error:", error);
     alert(`Error fetching challenges: ${error.message || "Unknown error. Please try again."}`);
@@ -188,7 +190,6 @@ function fillChallenge(index, challenge) {
     <p><strong>Sample Input:</strong> ${challenge.sample_input}</p>
     <p><strong>Sample Output:</strong> ${challenge.sample_output}</p>
   `;
-  // Add event listener for Enter key on chat input
   document.getElementById(`chat-input-${index}`).addEventListener("keypress", function(e) {
     if (e.key === "Enter") sendChatMessage(index);
   });
@@ -199,9 +200,12 @@ async function runCode(index) {
   const langSelect = document.getElementById(`language-select-${index}`);
   const outputBlock = document.getElementById(`output-block-${index}`);
   const resultDiv = document.getElementById(`execution-result-${index}`);
+  const chatBox = document.getElementById(`chat-box-${index}`);
 
   const code = codeInput.value.trim();
   const language = langSelect.value;
+
+  const isScrolledToBottom = chatBox.scrollHeight - chatBox.scrollTop === chatBox.clientHeight;
 
   try {
     const response = await fetch("/api/submit_code", {
@@ -219,25 +223,28 @@ async function runCode(index) {
       <p><strong>Error:</strong> ${data.error || "No error"}</p>
       <p><strong>Execution Time:</strong> ${data.execution_time || "N/A"}</p>
     `;
-    // Increment errors if there's an error in the output
     if (data.error) {
       sessionStorage.setItem("performance", JSON.stringify({
         ...JSON.parse(sessionStorage.getItem("performance") || "{}"),
         errors: (JSON.parse(sessionStorage.getItem("performance") || "{}").errors || 0) + 1
       }));
     }
-    // Trigger chatbot feedback after running code
     const challengeContext = buildChallengeContext(index);
-    autoChatAfterRun(data.output || data.error || "No output", challengeContext, index);
+    await autoChatAfterRun(data.output || data.error || "No output", challengeContext, index);
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   } catch (error) {
     console.error("Run code error:", error);
     outputBlock.style.display = "block";
     resultDiv.innerHTML = `<p class="error">Error executing code: ${error.message || "Unknown error. Please try again."}</p>`;
-    // Increment errors on failed execution
     sessionStorage.setItem("performance", JSON.stringify({
       ...JSON.parse(sessionStorage.getItem("performance") || "{}"),
       errors: (JSON.parse(sessionStorage.getItem("performance") || "{}").errors || 0) + 1
     }));
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   }
 }
 
@@ -246,6 +253,10 @@ async function analyzeCode(index) {
   analyzeBtn.disabled = true;
   analyzeBtn.textContent = "Analyzing...";
   const code = document.getElementById(`code-input-${index}`).value.trim();
+  const chatBox = document.getElementById(`chat-box-${index}`);
+
+  const isScrolledToBottom = chatBox.scrollHeight - chatBox.scrollTop === chatBox.clientHeight;
+
   if (!code) {
     alert("Please write some code to analyze!");
     analyzeBtn.disabled = false;
@@ -268,21 +279,31 @@ async function analyzeCode(index) {
     } else {
       addChatMessage(data.analysis, "bot", `chat-box-${index}`);
     }
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   } catch (error) {
     console.error("Analysis error:", error);
     addChatMessage(`Sorry, I couldn’t analyze the code: ${error.message || "Unknown error. Please try again."}`, "bot", `chat-box-${index}`);
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   }
   analyzeBtn.disabled = false;
   analyzeBtn.textContent = "AI Analysis";
 }
-
 async function submitCode(index) {
   const submitBtn = document.getElementById(`submit-btn-${index}`);
   submitBtn.disabled = true;
   submitBtn.textContent = "Submitting...";
   const code = document.getElementById(`code-input-${index}`).value.trim();
   const lang = document.getElementById(`language-select-${index}`).value;
+  const chatBox = document.getElementById(`chat-box-${index}`);
+
+  const isScrolledToBottom = chatBox.scrollHeight - chatBox.scrollTop === chatBox.clientHeight;
+
   try {
+    // Submit the code for execution
     const response = await fetch("/api/submit_code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -292,49 +313,80 @@ async function submitCode(index) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     const data = await response.json();
+
     if (data.error) {
       alert(`Error: ${data.error}`);
-      // Increment errors on failed submission
       sessionStorage.setItem("performance", JSON.stringify({
         ...JSON.parse(sessionStorage.getItem("performance") || "{}"),
         errors: (JSON.parse(sessionStorage.getItem("performance") || "{}").errors || 0) + 1
       }));
     } else {
-      alert(data.output || "Submitted successfully!");
-      sessionStorage.setItem(`coding_score_${index}`, "4"); // 4 points per challenge
-      console.log(`Coding Score for Challenge ${index}:`, sessionStorage.getItem(`coding_score_${index}`));
-      // Navigate based on which challenge was submitted
+      // Get AI feedback after execution
+      const challengeContext = buildChallengeContext(index);
+      await autoChatAfterRun(data.output || "No output", challengeContext, index);
+
+      // Retrieve the AI's response from sessionStorage
+      const botResponse = sessionStorage.getItem(`bot_response_${index}`) || "No feedback available";
+
+      // Evaluate the code quality using the AI response
+      const evalResponse = await fetch("/api/evaluate_code_response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bot_response: botResponse })
+      });
+      if (!evalResponse.ok) {
+        throw new Error(`HTTP error! Status: ${evalResponse.status}`);
+      }
+      const evalData = await evalResponse.json();
+      const codingScore = evalData.code_score; // Score out of 10
+
+      // Store the AI-evaluated score
+      sessionStorage.setItem(`coding_score_${index}`, codingScore.toString());
+      console.log(`Coding Score for Challenge ${index}:`, codingScore);
+      alert(`Challenge ${index} submitted successfully! Score: ${codingScore}/10`);
+
       if (index === 1) {
         showScreen("round2_challenge2");
       } else if (index === 2) {
-        const codingScore = (parseInt(sessionStorage.getItem("coding_score_1") || 0) + 
-                            parseInt(sessionStorage.getItem("coding_score_2") || 0));
-        sessionStorage.setItem("coding_score", codingScore.toString());
-        console.log("Total Coding Score:", codingScore);
+        const codingScoreChallenge1 = parseInt(sessionStorage.getItem("coding_score_1") || 0);
+        const codingScoreChallenge2 = parseInt(sessionStorage.getItem("coding_score_2") || 0);
+        const totalCodingScore = codingScoreChallenge1 + codingScoreChallenge2; // Out of 20
+        sessionStorage.setItem("coding_score", totalCodingScore.toString());
+        console.log("Total Coding Score:", totalCodingScore);
         showScreen("results");
       }
+    }
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
     }
   } catch (error) {
     console.error("Submit code error:", error);
     alert(`Submission failed: ${error.message || "Unknown error. Please check your API key or network connection."}`);
-    // Increment errors on failed submission
     sessionStorage.setItem("performance", JSON.stringify({
       ...JSON.parse(sessionStorage.getItem("performance") || "{}"),
       errors: (JSON.parse(sessionStorage.getItem("performance") || "{}").errors || 0) + 1
     }));
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   }
   submitBtn.disabled = false;
   submitBtn.textContent = "Submit";
 }
-
 function addChatMessage(text, sender, chatBoxId) {
   const chatBox = document.getElementById(chatBoxId);
   if (!chatBox) return;
+
+  const isScrolledToBottom = chatBox.scrollHeight - chatBox.scrollTop === chatBox.clientHeight;
+
   const msgDiv = document.createElement("div");
   msgDiv.classList.add("message", sender);
   msgDiv.textContent = text;
   chatBox.appendChild(msgDiv);
-  chatBox.scrollTop = chatBox.scrollHeight;
+
+  if (isScrolledToBottom) {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
 }
 
 function clearChat(chatBoxId) {
@@ -347,6 +399,10 @@ async function initiateChatConversation(index) {
   const challengeContext = challenge ?
     `Challenge ${index} of 2: ${challenge.title} - ${challenge.description}\nSample Input: ${challenge.sample_input}\nSample Output: ${challenge.sample_output}` :
     "No challenge context available";
+  const chatBox = document.getElementById(`chat-box-${index}`);
+
+  const isScrolledToBottom = chatBox.scrollHeight - chatBox.scrollTop === chatBox.clientHeight;
+
   try {
     const response = await fetch("/api/message", {
       method: "POST",
@@ -362,7 +418,6 @@ async function initiateChatConversation(index) {
     }
     const data = await response.json();
     addChatMessage(data.response, "bot", `chat-box-${index}`);
-    // Follow up with "How can I help?"
     setTimeout(() => {
       addChatMessage("How can I help you with this challenge? For example, would you like a hint to get started?", "bot", `chat-box-${index}`);
     }, 1000);
@@ -373,6 +428,10 @@ async function initiateChatConversation(index) {
 }
 
 async function autoChatAfterRun(runResult, challengeContext, index) {
+  const chatBox = document.getElementById(`chat-box-${index}`);
+
+  const isScrolledToBottom = chatBox.scrollHeight - chatBox.scrollTop === chatBox.clientHeight;
+
   try {
     const response = await fetch("/api/message", {
       method: "POST",
@@ -388,9 +447,16 @@ async function autoChatAfterRun(runResult, challengeContext, index) {
     }
     const data = await response.json();
     addChatMessage(data.response, "bot", `chat-box-${index}`);
+    sessionStorage.setItem(`bot_response_${index}`, data.response);
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   } catch (error) {
     console.error("Chat error:", error);
     addChatMessage(`I couldn’t analyze the run result: ${error.message || "Unknown error. Please try again."}`, "bot", `chat-box-${index}`);
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   }
 }
 
@@ -398,6 +464,10 @@ async function sendChatMessage(index) {
   const inputField = document.getElementById(`chat-input-${index}`);
   const sendBtn = document.getElementById(`round2-send-btn-${index}`);
   const message = inputField.value.trim();
+  const chatBox = document.getElementById(`chat-box-${index}`);
+
+  const isScrolledToBottom = chatBox.scrollHeight - chatBox.scrollTop === chatBox.clientHeight;
+
   if (!message) return;
 
   addChatMessage(message, "user", `chat-box-${index}`);
@@ -424,10 +494,22 @@ async function sendChatMessage(index) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     const data = await response.json();
+    if (message.toLowerCase().includes("hint")) {
+      sessionStorage.setItem("performance", JSON.stringify({
+        ...JSON.parse(sessionStorage.getItem("performance") || "{}"),
+        hints: (JSON.parse(sessionStorage.getItem("performance") || "{}").hints || 0) + 1
+      }));
+    }
     addChatMessage(data.response, "bot", `chat-box-${index}`);
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   } catch (error) {
     console.error("Chat error:", error);
     addChatMessage(`Sorry, something went wrong: ${error.message || "Unknown error. Please try again."}`, "bot", `chat-box-${index}`);
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   }
   sendBtn.disabled = false;
   sendBtn.textContent = "Send";
@@ -443,44 +525,284 @@ function buildChallengeContext(index) {
  * 4) Results
  *******************************************************/
 async function fetchFinalReport() {
+  const finalDiv = document.getElementById("final-report");
+  finalDiv.innerHTML = `
+    <div class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>Processing your results...</p>
+    </div>
+  `;
+
   try {
     const response = await fetch("/api/final_report");
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     const data = await response.json();
-    const finalDiv = document.getElementById("final-report");
 
     if (data.error) {
       finalDiv.innerHTML = `<p class="error">${data.error || "Failed to fetch final report. Please try again."}</p>`;
       return;
     }
+
+    // Update the DOM with the fetched data
     finalDiv.innerHTML = `
-      <p><strong>Overall Score:</strong> ${data.overall_score}/30</p>
-      <p><strong>Time Limit:</strong> ${data.time_limit}</p>
-      <h3>Category Scores</h3>
-      <ul>
-        <li><strong>MCQs:</strong> ${data.category_scores.MCQs}</li>
-        <li><strong>Coding:</strong> ${data.category_scores.Coding}</li>
-        <li><strong>Behavioral:</strong> ${data.category_scores.Behavioral}</li>
-      </ul>
-      <p><strong>Badges:</strong> ${data.badges.join(", ") || "None"}</p>
-      <p><strong>Feedback:</strong> ${data.message}</p>
-      <h4>Behavioral Feedback</h4>
-      <ul>
-        ${data.behavioral_feedback.map(f => `<li>${f}</li>`).join("")}
-      </ul>
-      ${data.transcript && data.transcript.length > 0 ? `
-        <h4>Transcript</h4>
-        <div>
-          ${data.transcript.map(t => `<p><strong>${t.speaker}:</strong> ${t.message}</p>`).join("")}
+      <div class="score-section">
+        <p><strong>Overall Score:</strong> <span id="overall-score">${data.overall_score}/30</span></p>
+        <div class="progress-bar">
+          <div id="overall-progress" class="progress-fill" style="width: ${(data.overall_score / 30) * 100}%"></div>
         </div>
-      ` : ""}
+      </div>
+
+      <h3>Category Scores</h3>
+      <canvas id="category-scores-chart" width="400" height="200"></canvas>
+
+      <h3>Performance Metrics</h3>
+      <canvas id="performance-metrics-chart" width="400" height="300"></canvas>
+
+      <h3>Your Achievements</h3>
+      <div id="badges-section" class="badges-container"></div>
+
+      <h3>Performance Analysis</h3>
+      <div id="ai-analysis"></div>
+
+      <h3>Leaderboard</h3>
+      <ul id="leaderboard" class="leaderboard"></ul>
+
+      <div id="transcript-section">
+        <h4>Transcript</h4>
+        <div id="transcript-content"></div>
+      </div>
     `;
+
+    // Render Category Scores Bar Chart
+const categoryCtx = document.getElementById("category-scores-chart").getContext("2d");
+new Chart(categoryCtx, {
+  type: "bar",
+  data: {
+    labels: ["MCQs", "Coding", "Behavioral"],
+    datasets: [{
+      label: "Score (out of 10)",
+      data: [
+        parseInt(data.category_scores.MCQs) || 0,
+        Math.round((parseInt(data.category_scores.Coding) || 0) / 2), // Normalize from 0-20 to 0-10
+        parseInt(data.category_scores.Behavioral) || 0
+      ],
+      backgroundColor: [
+        "rgba(108, 99, 255, 0.7)",
+        "rgba(74, 66, 179, 0.7)",
+        "rgba(40, 35, 102, 0.7)"
+      ],
+      borderColor: [
+        "rgba(108, 99, 255, 1)",
+        "rgba(74, 66, 179, 1)",
+        "rgba(40, 35, 102, 1)"
+      ],
+      borderWidth: 1
+    }]
+  },
+  options: {
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 10,
+        ticks: {
+          color: "#ccc",
+          stepSize: 2
+        },
+        grid: {
+          color: "rgba(255, 255, 255, 0.1)"
+        }
+      },
+      x: {
+        ticks: {
+          color: "#ccc"
+        },
+        grid: {
+          display: false
+        }
+      }
+    },
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            return `${context.dataset.label}: ${context.raw}/10`;
+          }
+        }
+      }
+    }
+  }
+});
+    // Render Performance Metrics Radar Chart with Tooltips
+    const performanceCtx = document.getElementById("performance-metrics-chart").getContext("2d");
+    const performanceData = JSON.parse(sessionStorage.getItem("performance") || "{}");
+    const hintsUsed = parseInt(performanceData.hints) || 0;
+    const errorsMade = parseInt(performanceData.errors) || 0;
+    const timeTaken = parseInt(performanceData.time_taken) || 0;
+    const radarData = [
+      hintsUsed, // Raw value for Hints Used
+      errorsMade, // Raw value for Errors Made
+      timeTaken  // Raw value for Time Taken (in minutes)
+    ];
+    new Chart(performanceCtx, {
+      type: "radar",
+      data: {
+        labels: ["Hints Used", "Errors Made", "Time Taken (min)"],
+        datasets: [{
+          label: "Performance Metrics",
+          data: [
+            hintsUsed / 5, // Normalized to 0-5 scale
+            errorsMade / 5, // Normalized to 0-5 scale
+            timeTaken / 90 * 5 // Normalized to 0-5 scale (90 min max)
+          ],
+          backgroundColor: "rgba(108, 99, 255, 0.2)",
+          borderColor: "rgba(108, 99, 255, 1)",
+          borderWidth: 2,
+          pointBackgroundColor: "rgba(108, 99, 255, 1)"
+        }]
+      },
+      options: {
+        scales: {
+          r: {
+            beginAtZero: true,
+            max: 5,
+            ticks: {
+              stepSize: 1,
+              color: "#ccc",
+              backdropColor: "rgba(0, 0, 0, 0)"
+            },
+            grid: {
+              color: "rgba(255, 255, 255, 0.1)"
+            },
+            angleLines: {
+              color: "rgba(255, 255, 255, 0.1)"
+            },
+            pointLabels: {
+              color: "#ccc"
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const label = context.label || '';
+                const rawValue = radarData[context.dataIndex];
+                if (label === "Hints Used") {
+                  return `${label}: ${rawValue} hint(s)`;
+                } else if (label === "Errors Made") {
+                  return `${label}: ${rawValue} error(s)`;
+                } else if (label === "Time Taken (min)") {
+                  return `${label}: ${rawValue} minute(s)`;
+                }
+                return `${label}: ${rawValue}`;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Add a caption below the radar chart
+    const performanceMetricsChart = document.getElementById("performance-metrics-chart");
+    const caption = document.createElement("div");
+    caption.className = "chart-caption";
+    caption.innerHTML = `
+      <p>Hints Used: Number of hints requested during coding challenges.</p>
+      <p>Errors Made: Number of code execution errors encountered.</p>
+      <p>Time Taken: Total time taken for the interview (in minutes).</p>
+    `;
+    performanceMetricsChart.parentNode.insertBefore(caption, performanceMetricsChart.nextSibling);
+
+    // Badges Section with Gamification
+    const badgesDiv = document.getElementById("badges-section");
+    badgesDiv.innerHTML = "";
+    data.badges.forEach(badge => {
+      const badgeIcon = getBadgeIcon(badge);
+      badgesDiv.innerHTML += `
+        <div class="badge">
+          <span class="badge-icon">${badgeIcon}</span>
+          <span>${badge}</span>
+        </div>
+      `;
+    });
+
+    // AI-Driven Analysis in Bullet Points
+    const analysisDiv = document.getElementById("ai-analysis");
+    const analysisPoints = parseAnalysisToPoints(data.message);
+    analysisDiv.innerHTML = `
+      <ul class="analysis-list">
+        ${analysisPoints.map(point => `<li>${point.replace(/^-\s*/, '')}</li>`).join("")}
+      </ul>
+    `;
+
+    // Leaderboard
+    const leaderboardDiv = document.getElementById("leaderboard");
+    leaderboardDiv.innerHTML = "";
+    data.leaderboard.forEach(entry => {
+      leaderboardDiv.innerHTML += `
+        <li class="${entry.name === 'You' ? 'highlight' : ''}">
+          ${entry.name}: ${entry.totalScore}/30
+        </li>
+      `;
+    });
+
+    // Transcript (Optional)
+    const transcriptDiv = document.getElementById("transcript-content");
+    const transcriptSection = document.getElementById("transcript-section");
+    if (data.transcript && data.transcript.length > 0) {
+      transcriptDiv.innerHTML = data.transcript.map(t => `<p><strong>${t.speaker}:</strong> ${t.message}</p>`).join("");
+    } else {
+      transcriptSection.style.display = "none";
+    }
+
+    // Trigger reveal animations after a slight delay to ensure DOM rendering
+    setTimeout(() => {
+      document.querySelector('.score-section').classList.add('reveal');
+      document.querySelector('.badges-container').classList.add('reveal');
+      document.getElementById('ai-analysis').classList.add('reveal');
+      document.querySelector('.leaderboard').classList.add('reveal');
+      document.getElementById('transcript-section').classList.add('reveal');
+    }, 100);
   } catch (error) {
     console.error("Fetch final report error:", error);
-    document.getElementById("final-report").innerText = `Error fetching final report: ${error.message || "Unknown error. Please try again."}`;
+    finalDiv.innerHTML = `<p class="error">Error fetching final report: ${error.message || "Unknown error. Please try again."}</p>`;
   }
+}
+
+function parseAnalysisToPoints(analysis) {
+  // Ensure analysis is a string
+  if (typeof analysis !== 'string') {
+    analysis = String(analysis);
+  }
+  
+  // Split on newlines and filter out empty lines
+  const points = analysis.split('\n').filter(point => point.trim());
+  
+  // If the analysis contains an error message, wrap it as a single bullet point
+  if (points.length === 1 && points[0].startsWith("Error generating AI analysis")) {
+    return [points[0]];
+  }
+  
+  // Remove leading '- ' if present, and trim each point
+  return points.map(point => point.replace(/^-\s*/, '').trim());
+}
+
+function getBadgeIcon(badge) {
+  const icons = {
+    "Code Enthusiast": "🏆",
+    "Speedster": "⚡",
+    "Communicator": "💬",
+    "Team Player": "🤝"
+  };
+  return icons[badge] || "⭐";
 }
 
 /*******************************************************

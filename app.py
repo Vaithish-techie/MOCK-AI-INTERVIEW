@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask, render_template, session, request, jsonify
 from flask_cors import CORS
 from routes.chat import chat_bp
@@ -10,6 +11,11 @@ from routes.ai_feedback import ai_feedback_bp
 from extensions import db
 import config
 import time
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -28,20 +34,22 @@ def create_app():
     app.register_blueprint(database_bp, url_prefix="/api")
     app.register_blueprint(ai_feedback_bp, url_prefix="/api")
 
+    # Global error handler for 500 errors
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        logger.error(f"Unhandled exception: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({"error": "Internal server error occurred. Please try again later."}), 500
+
     @app.route("/")
     def index():
-        # Start the timer when the user begins the interview
         if "start_time" not in session:
             session["start_time"] = time.time()
+        if "performance" not in session:
+            session["performance"] = {"hints": 0, "errors": 0, "time_taken": 0, "behavioral_traits": []}
         return render_template("index.html")
-
-    @app.route("/round2")
-    def round2():
-        return render_template("round2.html")
 
     @app.route("/api/final_report", methods=["GET"])
     def final_report_with_time():
-        # Calculate time taken since the interview started
         start_time = session.get("start_time", time.time())
         time_taken = int((time.time() - start_time) / 60)  # Convert seconds to minutes
         if "performance" not in session:

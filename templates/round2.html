@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Interview Assistant - Round 2</title>
+  <!-- Link to your centralized CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h2 class="logo">MOCK AI INTERVIEW</h2>
+    <ul class="nav-links">
+      <!-- Link back to Round 1 -->
+      <li><a href="/">Round 1 (MCQs)</a></li>
+      <!-- Link to Round 2 (this page) -->
+      <li><a href="/round2">Round 2 (Coding)</a></li>
+    </ul>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div id="round2" class="screen active">
+      <h1>Round 2: Coding Challenges</h1>
+      <button class="btn" onclick="fetchBalancedChallenges()">Load 2 Challenges</button>
+
+      <!-- Challenge 1 Screen -->
+      <div id="challenge1-screen" class="screen active">
+        <h2 id="challenge-label">Challenge #1</h2>
+        <div class="challenge-container">
+          <!-- Left side (Question & Code run) -->
+          <div class="left-col">
+            <div class="question-card" id="question-1-card">
+              <h3>Problem #1</h3>
+              <p>(Waiting to load...)</p>
+            </div>
+            <div class="buttons-row">
+              <button class="small-btn" onclick="runCode(1)">Run Code</button>
+              <button class="small-btn" onclick="toggleAnalysis(1)">AI Analysis</button>
+            </div>
+            <div class="expansion-block" id="output-block-1">
+              <h4>Output</h4>
+              <div id="execution-result-1"></div>
+            </div>
+            <div class="expansion-block" id="analysis-block-1">
+              <h4>AI Analysis</h4>
+              <div id="analysis-result-1"></div>
+            </div>
+          </div>
+          <!-- Right side (Code editor + Chat) -->
+          <div class="right-col">
+            <label for="language-select-1">Language:</label>
+            <select id="language-select-1">
+              <option value="python">Python</option>
+              <option value="cpp">C++</option>
+              <option value="java">Java</option>
+            </select>
+            <textarea id="code-input-1" placeholder="Write your code here..."></textarea>
+
+            <!-- Chat for Challenge #1 -->
+            <div class="chat-box" id="chat-box-1"></div>
+            <div class="chat-input-container">
+              <input type="text" id="chat-input-1" placeholder="Type your message...">
+              <button class="btn" onclick="sendChatMessage(1)">Send</button>
+            </div>
+          </div>
+        </div>
+        <!-- Next Challenge Button -->
+        <button class="btn" onclick="showChallenge2()">Next Challenge</button>
+      </div>
+
+      <!-- Challenge 2 Screen (hidden initially) -->
+      <div id="challenge2-screen" class="screen">
+        <h2>Challenge #2</h2>
+        <div class="challenge-container">
+          <!-- Left side (Question & Code run) -->
+          <div class="left-col">
+            <div class="question-card" id="question-2-card">
+              <h3>Problem #2</h3>
+              <p>(Waiting to load...)</p>
+            </div>
+            <div class="buttons-row">
+              <button class="small-btn" onclick="runCode(2)">Run Code</button>
+              <button class="small-btn" onclick="toggleAnalysis(2)">AI Analysis</button>
+            </div>
+            <div class="expansion-block" id="output-block-2">
+              <h4>Output</h4>
+              <div id="execution-result-2"></div>
+            </div>
+            <div class="expansion-block" id="analysis-block-2">
+              <h4>AI Analysis</h4>
+              <div id="analysis-result-2"></div>
+            </div>
+          </div>
+          <!-- Right side (Code editor + Chat) -->
+          <div class="right-col">
+            <label for="language-select-2">Language:</label>
+            <select id="language-select-2">
+              <option value="python">Python</option>
+              <option value="cpp">C++</option>
+              <option value="java">Java</option>
+            </select>
+            <textarea id="code-input-2" placeholder="Write your code here..."></textarea>
+
+            <!-- Chat for Challenge #2 -->
+            <div class="chat-box" id="chat-box-2"></div>
+            <div class="chat-input-container">
+              <input type="text" id="chat-input-2" placeholder="Type your message...">
+              <button class="btn" onclick="sendChatMessage(2)">Send</button>
+            </div>
+          </div>
+        </div>
+        <!-- Finish Interview => Go back to index, show results -->
+        <button class="btn" onclick="location.href='/'">Finish Interview</button>
+        <!-- OR if you want to auto-show results:
+             <button class="btn" onclick="location.href='/#results'">Finish Interview</button> -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+  <script>
+    // Show Challenge 2 and hide Challenge 1
+    function showChallenge2() {
+      document.getElementById('challenge1-screen').classList.remove('active');
+      document.getElementById('challenge2-screen').classList.add('active');
+    }
+  </script>
+</body>
+</html>
