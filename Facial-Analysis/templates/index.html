@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Interview Analysis</title>
+</head>
+<body>
+    <h1>Live Video Feed</h1>
+    <img src="{{ url_for('video_feed') }}" width="50%">
+
+    <h2>Results</h2>
+    <button onclick="fetchResults()">Get Analysis</button>
+    <pre id="resultText"></pre>
+
+    <script>
+        function fetchResults() {
+            fetch('/results')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('resultText').innerText = JSON.stringify(data, null, 2);
+                });
+        }
+    </script>
+</body>
+</html>
