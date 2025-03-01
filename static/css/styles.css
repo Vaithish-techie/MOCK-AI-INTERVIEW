@@ -1,3 +1,4 @@
+/* static/css/styles.css */
 /* ---------------------------------------------------------
    1) Base & Font Import
 --------------------------------------------------------- */
@@ -91,6 +92,13 @@ body {
   transform: scale(1.05);
   background: linear-gradient(45deg, #5a54d7, #4842b3);
   box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
+}
+
+.btn:disabled {
+  background: #555;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .small-btn {
@@ -543,6 +551,7 @@ textarea {
   margin-right: auto;
 }
 
+/* Chat Input Container */
 .chat-input-container {
   display: flex;
   gap: 10px;
@@ -572,7 +581,65 @@ textarea {
 }
 
 /* ---------------------------------------------------------
-   10) Responsiveness
+   10) Behavioral Round Styles (New)
+--------------------------------------------------------- */
+.recording-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  margin: 20px 0;
+  background: #2a2a40;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+#video-preview {
+  border: 2px solid #6c63ff;
+  border-radius: 8px;
+  background: #1e1e2f;
+  max-width: 100%;
+  height: auto;
+}
+
+#audio-preview {
+  display: none; /* Hidden as it’s for capture only */
+}
+
+.feedback-container {
+  background: #29293d;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.feedback-container h4 {
+  font-size: 18px;
+  margin-bottom: 10px;
+  color: #fff;
+}
+
+#feedback-list {
+  list-style-type: disc;
+  padding-left: 20px;
+  margin: 0 0 10px 0;
+  color: #ccc;
+}
+
+#feedback-list li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+#follow-up-question {
+  color: #6c63ff;
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------
+   11) Responsiveness (Updated)
 --------------------------------------------------------- */
 @media (max-width: 768px) {
   .sidebar {
@@ -604,7 +671,14 @@ textarea {
     height: 200px;
     max-height: 200px;
   }
-/* Add to styles.css */
+  .recording-container {
+    padding: 10px;
+  }
+  #video-preview {
+    width: 100%;
+    max-width: 300px;
+  }
+}
 
 /* Performance Metrics Caption */
 #performance-metrics-chart + .chart-caption {
@@ -616,5 +690,4 @@ textarea {
 
 .chart-caption p {
   margin: 5px 0;
-}
 }

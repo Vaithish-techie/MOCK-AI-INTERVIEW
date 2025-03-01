@@ -15,6 +15,7 @@
       <li><a href="#" onclick="showScreen('dashboard')">Dashboard</a></li>
       <li><a href="#" onclick="showScreen('round1')">Round 1 (MCQs)</a></li>
       <li><a href="#" onclick="showScreen('round2_challenge1')">Round 2 (Coding)</a></li>
+      <li><a href="#" onclick="showScreen('round3')">Round 3 (Behavioral)</a></li>
       <li><a href="#" onclick="showScreen('results')">Results</a></li>
     </ul>
   </div>
@@ -45,7 +46,6 @@
     <!-- 3) Round 2: Challenge 1 -->
     <div id="round2_challenge1" class="screen">
       <h1>Round 2: Coding Challenges</h1>
-
       <!-- Challenge #1 Container -->
       <div class="challenge-container" id="challenge-1-container">
         <!-- Left Column (2/3rd) -->
@@ -80,7 +80,6 @@
           </div>
         </div>
       </div>
-
       <div class="nav-buttons">
         <button class="btn" onclick="showScreen('round2_challenge2')">Next Challenge</button>
       </div>
@@ -89,7 +88,6 @@
     <!-- 4) Round 2: Challenge 2 -->
     <div id="round2_challenge2" class="screen">
       <h1>Round 2: Coding Challenges</h1>
-
       <!-- Challenge #2 Container -->
       <div class="challenge-container" id="challenge-2-container">
         <!-- Left Column (2/3rd) -->
@@ -124,14 +122,36 @@
           </div>
         </div>
       </div>
-
       <div class="nav-buttons">
         <button class="btn" onclick="showScreen('round2_challenge1')">Previous Challenge</button>
+        <button class="btn" onclick="showScreen('round3')">Next Round</button>
+      </div>
+    </div>
+
+    <!-- 5) Round 3: Behavioral -->
+    <div id="round3" class="screen">
+      <h1>Round 3: Behavioral Interview</h1>
+      <div class="question-card" id="behavioral-question">
+        <h3>Question</h3>
+        <p>Loading...</p>
+      </div>
+      <div class="recording-container">
+        <video id="video-preview" width="320" height="240" autoplay muted></video>
+        <audio id="audio-preview" style="display:none;"></audio>
+        <button class="btn" id="start-recording">Start Recording</button>
+        <button class="btn" id="stop-recording" disabled>Stop Recording</button>
+      </div>
+      <div class="feedback-container" id="behavioral-feedback">
+        <h4>Feedback</h4>
+        <ul id="feedback-list"></ul>
+        <p><strong>Next Question:</strong> <span id="follow-up-question"></span></p>
+      </div>
+      <div class="nav-buttons">
         <button class="btn" onclick="showScreen('results')">Finish Interview</button>
       </div>
     </div>
 
-    <!-- 5) Results Screen -->
+    <!-- 6) Results Screen -->
     <div id="results" class="screen">
       <h1>Final Report</h1>
       <div id="final-report" class="result-box">
@@ -167,13 +187,12 @@
 
         <!-- Transcript (Optional) -->
         <div id="transcript-section">
-          <h4>Transcript</h4>
-          <div id="transcript-content"></div>
+          <h4>Transcript <button id="toggle-transcript" onclick="toggleTranscript()">Show/Hide</button></h4>
+          <div id="transcript-content" style="display: none;"></div>
         </div>
       </div>
       <button class="btn" onclick="restartInterview()">Restart Interview</button>
     </div>
-
   </div>
 
   <!-- Scripts -->

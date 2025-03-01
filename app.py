@@ -8,6 +8,7 @@ from routes.results import results_bp
 from routes.rounds import rounds_bp
 from routes.database import database_bp
 from routes.ai_feedback import ai_feedback_bp
+from routes.behavioral import behavioral_bp
 from extensions import db
 import config
 import time
@@ -34,6 +35,7 @@ def create_app():
     app.register_blueprint(rounds_bp, url_prefix="/api")
     app.register_blueprint(database_bp, url_prefix="/api")
     app.register_blueprint(ai_feedback_bp, url_prefix="/api")
+    app.register_blueprint(behavioral_bp, url_prefix='/api')
 
     # Global error handler for 500 errors
     @app.errorhandler(Exception)
@@ -54,5 +56,5 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     with app.app_context():
-        db.create_all()
+        db.create_all()     
     app.run(debug=True, use_reloader=False, host="0.0.0.0", port=5000)

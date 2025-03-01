@@ -1,4 +1,3 @@
-# routes/results.py
 from flask import Blueprint, jsonify, session, request
 import requests
 import logging
@@ -109,4 +108,4 @@ def final_report():
 
     except Exception as e:
         logger.error(f"Error in final_report: {str(e)}\n{traceback.format_exc()}")
-        return jsonify({"error": "Internal server error occurred while generating the final report."}), 500
+        return jsonify({"error": "Internal server error occurred while generating the final report."}), 500    
