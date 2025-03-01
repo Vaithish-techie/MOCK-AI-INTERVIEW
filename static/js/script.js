@@ -348,19 +348,21 @@ async function submitCode(index) {
       const evalData = await evalResponse.json();
       const codingScore = evalData.code_score; // Score out of 10
 
-      // Store the AI-evaluated score
+      // Store the AI-evaluated score for the individual challenge
       sessionStorage.setItem(`coding_score_${index}`, codingScore.toString());
       console.log(`Coding Score for Challenge ${index}:`, codingScore);
       alert(`Challenge ${index} submitted successfully! Score: ${codingScore}/10`);
 
+      // Calculate total coding score after each submission
+      const codingScoreChallenge1 = parseInt(sessionStorage.getItem("coding_score_1") || 0);
+      const codingScoreChallenge2 = parseInt(sessionStorage.getItem("coding_score_2") || 0);
+      const totalCodingScore = codingScoreChallenge1 + codingScoreChallenge2; // Out of 20
+      sessionStorage.setItem("coding_score", totalCodingScore.toString());
+      console.log(`Updated Total Coding Score after Challenge ${index}:`, totalCodingScore);
+
       if (index === 1) {
         showScreen("round2_challenge2");
       } else if (index === 2) {
-        const codingScoreChallenge1 = parseInt(sessionStorage.getItem("coding_score_1") || 0);
-        const codingScoreChallenge2 = parseInt(sessionStorage.getItem("coding_score_2") || 0);
-        const totalCodingScore = codingScoreChallenge1 + codingScoreChallenge2; // Out of 20
-        sessionStorage.setItem("coding_score", totalCodingScore.toString());
-        console.log("Total Coding Score:", totalCodingScore);
         showScreen("results");
       }
     }
@@ -588,7 +590,8 @@ async function fetchFinalReport() {
     performance.time_taken = timeTakenMinutes;
     sessionStorage.setItem("performance", JSON.stringify(performance));
 
-    console.log("Stored Scores - MCQ:", mcqScore, "Coding:", codingScore, "Behavioral:", behavioralScore, "Time Taken (minutes):", timeTakenMinutes);
+    // Debug: Log scores before sending to backend
+    console.log("Scores before sending to backend - MCQ:", mcqScore, "Coding (total, out of 20):", codingScore, "Behavioral:", behavioralScore, "Time Taken (minutes):", timeTakenMinutes);
 
     // Send scores to backend
     const response = await fetch("/api/final_report", {
@@ -614,7 +617,9 @@ async function fetchFinalReport() {
       return;
     }
 
-    console.log("Fetched Data:", data);
+    // Debug: Log fetched data
+    console.log("Fetched Data from Backend:", data);
+    console.log("Coding Score from Backend (should match total, out of 20):", data.category_scores.Coding);
 
     // Filter transcript to show only significant interactions
     const filteredTranscript = data.transcript ? data.transcript.filter(t => 
@@ -656,7 +661,7 @@ async function fetchFinalReport() {
     // Render Category Scores Bar Chart
     const categoryCtx = document.getElementById("category-scores-chart").getContext("2d");
     const codingScoreNormalized = Math.round((parseInt(data.category_scores.Coding) || 0) / 2); // Normalize from 0-20 to 0-10
-    console.log("Bar Graph Data - MCQs:", parseInt(data.category_scores.MCQs), "Coding (normalized):", codingScoreNormalized, "Behavioral:", parseInt(data.category_scores.Behavioral));
+    console.log("Bar Graph Data - MCQs:", parseInt(data.category_scores.MCQs), "Coding (normalized, out of 10):", codingScoreNormalized, "Behavioral:", parseInt(data.category_scores.Behavioral));
     new Chart(categoryCtx, {
       type: "bar",
       data: {

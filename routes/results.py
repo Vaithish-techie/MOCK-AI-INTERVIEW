@@ -22,13 +22,15 @@ def final_report():
         transcript_1 = data.get("transcript_1", [])
         transcript_2 = data.get("transcript_2", [])
 
+        # Debug: Log received scores
+        logger.info(f"Received scores from frontend - MCQ: {mcq_score}, Coding (out of 20): {coding_score}, Behavioral: {behavioral_score}")
+
         # Calculate overall score (normalize coding_score from 0-20 to 0-10)
         overall_score = int(mcq_score) + int(coding_score / 2) + int(behavioral_score)
-        logger.info(f"Received scores - MCQ: {mcq_score}, Coding: {coding_score}, Behavioral: {behavioral_score}, Overall: {overall_score}")
+        logger.info(f"Calculated Overall Score: {overall_score}")
 
         # Construct badges array based on performance
         badges = ["Code Enthusiast"]
-        # Safely access time_taken with a default value of 0
         time_taken = performance.get("time_taken", 0)
         if time_taken < 30:
             badges.append("Speedster")
