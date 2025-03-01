@@ -12,6 +12,7 @@ from extensions import db
 import config
 import time
 import logging
+import traceback
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -47,15 +48,6 @@ def create_app():
         if "performance" not in session:
             session["performance"] = {"hints": 0, "errors": 0, "time_taken": 0, "behavioral_traits": []}
         return render_template("index.html")
-
-    @app.route("/api/final_report", methods=["GET"])
-    def final_report_with_time():
-        start_time = session.get("start_time", time.time())
-        time_taken = int((time.time() - start_time) / 60)  # Convert seconds to minutes
-        if "performance" not in session:
-            session["performance"] = {"hints": 0, "errors": 0, "time_taken": 0, "behavioral_traits": []}
-        session["performance"]["time_taken"] = time_taken
-        return results_bp.final_report()
 
     return app
 

@@ -5,6 +5,11 @@ let totalMCQs = 0;
 let answeredCount = 0;
 window.twoChallenges = [];
 
+// Track the start time when the interview begins
+if (!sessionStorage.getItem("start_time")) {
+  sessionStorage.setItem("start_time", Date.now().toString());
+}
+
 /*******************************************************
  * 1) Screen Navigation
  *******************************************************/
@@ -38,6 +43,8 @@ function restartInterview() {
   showScreen("dashboard");
   window.twoChallenges = [];
   sessionStorage.clear(); // Clear sessionStorage to reset scores
+  // Reset start time for a new interview
+  sessionStorage.setItem("start_time", Date.now().toString());
 }
 
 /*******************************************************
@@ -127,7 +134,7 @@ async function submitMCQs() {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     const data = await response.json();
-    console.log("Submit MCQs response:", data); // Debug log
+    console.log("Submit MCQs response:", data);
     if (data.error) {
       document.getElementById("mcq-error").innerText = data.error;
     } else {
@@ -135,7 +142,7 @@ async function submitMCQs() {
       alert(`Round 1 Score: ${data.round1_score}/${totalQuestions}`);
       console.log("MCQ Score (raw):", data.round1_score);
       console.log("MCQ Score (normalized):", data.normalized_score);
-      sessionStorage.setItem("mcq_score", data.normalized_score.toString()); // Ensure it's a string
+      sessionStorage.setItem("mcq_score", data.normalized_score.toString());
       showScreen("round2_challenge1");
     }
   } catch (error) {
@@ -292,6 +299,7 @@ async function analyzeCode(index) {
   analyzeBtn.disabled = false;
   analyzeBtn.textContent = "AI Analysis";
 }
+
 async function submitCode(index) {
   const submitBtn = document.getElementById(`submit-btn-${index}`);
   submitBtn.disabled = true;
@@ -373,6 +381,7 @@ async function submitCode(index) {
   submitBtn.disabled = false;
   submitBtn.textContent = "Submit";
 }
+
 function addChatMessage(text, sender, chatBoxId) {
   const chatBox = document.getElementById(chatBoxId);
   if (!chatBox) return;
@@ -421,9 +430,18 @@ async function initiateChatConversation(index) {
     setTimeout(() => {
       addChatMessage("How can I help you with this challenge? For example, would you like a hint to get started?", "bot", `chat-box-${index}`);
     }, 1000);
+
+    // Store conversation in sessionStorage (only significant messages)
+    const historyKey = `conversation_history_${index}`;
+    let conversationHistory = sessionStorage.getItem(historyKey) ? JSON.parse(sessionStorage.getItem(historyKey)) : [];
+    conversationHistory.push({"role": "assistant", "content": data.response});
+    sessionStorage.setItem(historyKey, JSON.stringify(conversationHistory));
   } catch (error) {
     console.error("Chat error:", error);
     addChatMessage(`Sorry, I couldn’t start the conversation: ${error.message || "Unknown error. Please try again."}`, "bot", `chat-box-${index}`);
+    if (isScrolledToBottom) {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   }
 }
 
@@ -448,6 +466,15 @@ async function autoChatAfterRun(runResult, challengeContext, index) {
     const data = await response.json();
     addChatMessage(data.response, "bot", `chat-box-${index}`);
     sessionStorage.setItem(`bot_response_${index}`, data.response);
+
+    // Store conversation in sessionStorage (only significant messages)
+    const historyKey = `conversation_history_${index}`;
+    let conversationHistory = sessionStorage.getItem(historyKey) ? JSON.parse(sessionStorage.getItem(historyKey)) : [];
+    if (!data.response.toLowerCase().includes("hint")) {
+      conversationHistory.push({"role": "assistant", "content": data.response});
+      sessionStorage.setItem(historyKey, JSON.stringify(conversationHistory));
+    }
+
     if (isScrolledToBottom) {
       chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -501,6 +528,18 @@ async function sendChatMessage(index) {
       }));
     }
     addChatMessage(data.response, "bot", `chat-box-${index}`);
+
+    // Store conversation in sessionStorage (only significant messages)
+    const historyKey = `conversation_history_${index}`;
+    let conversationHistory = sessionStorage.getItem(historyKey) ? JSON.parse(sessionStorage.getItem(historyKey)) : [];
+    if (!message.toLowerCase().includes("hint") && !message.includes("Technical: yes")) {
+      conversationHistory.push({"role": "user", "content": message});
+    }
+    if (!data.response.toLowerCase().includes("hint")) {
+      conversationHistory.push({"role": "assistant", "content": data.response});
+    }
+    sessionStorage.setItem(historyKey, JSON.stringify(conversationHistory));
+
     if (isScrolledToBottom) {
       chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -534,7 +573,37 @@ async function fetchFinalReport() {
   `;
 
   try {
-    const response = await fetch("/api/final_report");
+    // Retrieve scores from sessionStorage
+    const mcqScore = parseInt(sessionStorage.getItem("mcq_score") || 0);
+    const codingScore = parseInt(sessionStorage.getItem("coding_score") || 0);
+    const behavioralScore = parseInt(sessionStorage.getItem("behavioral_score") || 0);
+
+    // Calculate time_taken (in minutes)
+    const startTime = parseInt(sessionStorage.getItem("start_time") || Date.now());
+    const endTime = Date.now();
+    const timeTakenMinutes = Math.round((endTime - startTime) / (1000 * 60)); // Convert milliseconds to minutes
+
+    // Update performance object with time_taken
+    let performance = JSON.parse(sessionStorage.getItem("performance") || "{}");
+    performance.time_taken = timeTakenMinutes;
+    sessionStorage.setItem("performance", JSON.stringify(performance));
+
+    console.log("Stored Scores - MCQ:", mcqScore, "Coding:", codingScore, "Behavioral:", behavioralScore, "Time Taken (minutes):", timeTakenMinutes);
+
+    // Send scores to backend
+    const response = await fetch("/api/final_report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mcq_score: mcqScore,
+        coding_score: codingScore,
+        behavioral_score: behavioralScore,
+        transcript_1: sessionStorage.getItem("conversation_history_1") ? JSON.parse(sessionStorage.getItem("conversation_history_1")) : [],
+        transcript_2: sessionStorage.getItem("conversation_history_2") ? JSON.parse(sessionStorage.getItem("conversation_history_2")) : [],
+        performance: performance
+      })
+    });
+
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
@@ -544,6 +613,15 @@ async function fetchFinalReport() {
       finalDiv.innerHTML = `<p class="error">${data.error || "Failed to fetch final report. Please try again."}</p>`;
       return;
     }
+
+    console.log("Fetched Data:", data);
+
+    // Filter transcript to show only significant interactions
+    const filteredTranscript = data.transcript ? data.transcript.filter(t => 
+      t.message.includes("The code execution result is") || // AI feedback after code run
+      t.message.includes("Challenge submitted successfully") || // Submission confirmation
+      !t.message.toLowerCase().includes("hint") // Exclude hint requests
+    ) : [];
 
     // Update the DOM with the fetched data
     finalDiv.innerHTML = `
@@ -570,73 +648,76 @@ async function fetchFinalReport() {
       <ul id="leaderboard" class="leaderboard"></ul>
 
       <div id="transcript-section">
-        <h4>Transcript</h4>
-        <div id="transcript-content"></div>
+        <h4>Transcript <button id="toggle-transcript" onclick="toggleTranscript()">Show/Hide</button></h4>
+        <div id="transcript-content" style="display: none;"></div>
       </div>
     `;
 
     // Render Category Scores Bar Chart
-const categoryCtx = document.getElementById("category-scores-chart").getContext("2d");
-new Chart(categoryCtx, {
-  type: "bar",
-  data: {
-    labels: ["MCQs", "Coding", "Behavioral"],
-    datasets: [{
-      label: "Score (out of 10)",
-      data: [
-        parseInt(data.category_scores.MCQs) || 0,
-        Math.round((parseInt(data.category_scores.Coding) || 0) / 2), // Normalize from 0-20 to 0-10
-        parseInt(data.category_scores.Behavioral) || 0
-      ],
-      backgroundColor: [
-        "rgba(108, 99, 255, 0.7)",
-        "rgba(74, 66, 179, 0.7)",
-        "rgba(40, 35, 102, 0.7)"
-      ],
-      borderColor: [
-        "rgba(108, 99, 255, 1)",
-        "rgba(74, 66, 179, 1)",
-        "rgba(40, 35, 102, 1)"
-      ],
-      borderWidth: 1
-    }]
-  },
-  options: {
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 10,
-        ticks: {
-          color: "#ccc",
-          stepSize: 2
-        },
-        grid: {
-          color: "rgba(255, 255, 255, 0.1)"
-        }
+    const categoryCtx = document.getElementById("category-scores-chart").getContext("2d");
+    const codingScoreNormalized = Math.round((parseInt(data.category_scores.Coding) || 0) / 2); // Normalize from 0-20 to 0-10
+    console.log("Bar Graph Data - MCQs:", parseInt(data.category_scores.MCQs), "Coding (normalized):", codingScoreNormalized, "Behavioral:", parseInt(data.category_scores.Behavioral));
+    new Chart(categoryCtx, {
+      type: "bar",
+      data: {
+        labels: ["MCQs", "Coding", "Behavioral"],
+        datasets: [{
+          label: "Score (out of 10)",
+          data: [
+            parseInt(data.category_scores.MCQs) || 0,
+            codingScoreNormalized,
+            parseInt(data.category_scores.Behavioral) || 0
+          ],
+          backgroundColor: [
+            "rgba(108, 99, 255, 0.7)",
+            "rgba(74, 66, 179, 0.7)",
+            "rgba(40, 35, 102, 0.7)"
+          ],
+          borderColor: [
+            "rgba(108, 99, 255, 1)",
+            "rgba(74, 66, 179, 1)",
+            "rgba(40, 35, 102, 1)"
+          ],
+          borderWidth: 1
+        }]
       },
-      x: {
-        ticks: {
-          color: "#ccc"
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 10,
+            ticks: {
+              color: "#ccc",
+              stepSize: 2
+            },
+            grid: {
+              color: "rgba(255, 255, 255, 0.1)"
+            }
+          },
+          x: {
+            ticks: {
+              color: "#ccc"
+            },
+            grid: {
+              display: false
+            }
+          }
         },
-        grid: {
-          display: false
-        }
-      }
-    },
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        callbacks: {
-          label: function(context) {
-            return `${context.dataset.label}: ${context.raw}/10`;
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `${context.dataset.label}: ${context.raw}/10`;
+              }
+            }
           }
         }
       }
-    }
-  }
-});
+    });
+
     // Render Performance Metrics Radar Chart with Tooltips
     const performanceCtx = document.getElementById("performance-metrics-chart").getContext("2d");
     const performanceData = JSON.parse(sessionStorage.getItem("performance") || "{}");
@@ -757,8 +838,8 @@ new Chart(categoryCtx, {
     // Transcript (Optional)
     const transcriptDiv = document.getElementById("transcript-content");
     const transcriptSection = document.getElementById("transcript-section");
-    if (data.transcript && data.transcript.length > 0) {
-      transcriptDiv.innerHTML = data.transcript.map(t => `<p><strong>${t.speaker}:</strong> ${t.message}</p>`).join("");
+    if (filteredTranscript.length > 0) {
+      transcriptDiv.innerHTML = filteredTranscript.map(t => `<p><strong>${t.speaker}:</strong> ${t.message}</p>`).join("");
     } else {
       transcriptSection.style.display = "none";
     }
@@ -778,20 +859,13 @@ new Chart(categoryCtx, {
 }
 
 function parseAnalysisToPoints(analysis) {
-  // Ensure analysis is a string
   if (typeof analysis !== 'string') {
     analysis = String(analysis);
   }
-  
-  // Split on newlines and filter out empty lines
   const points = analysis.split('\n').filter(point => point.trim());
-  
-  // If the analysis contains an error message, wrap it as a single bullet point
   if (points.length === 1 && points[0].startsWith("Error generating AI analysis")) {
     return [points[0]];
   }
-  
-  // Remove leading '- ' if present, and trim each point
   return points.map(point => point.replace(/^-\s*/, '').trim());
 }
 
@@ -803,6 +877,18 @@ function getBadgeIcon(badge) {
     "Team Player": "🤝"
   };
   return icons[badge] || "⭐";
+}
+
+function toggleTranscript() {
+  const transcriptContent = document.getElementById("transcript-content");
+  const toggleButton = document.getElementById("toggle-transcript");
+  if (transcriptContent.style.display === "none") {
+    transcriptContent.style.display = "block";
+    toggleButton.textContent = "Hide";
+  } else {
+    transcriptContent.style.display = "none";
+    toggleButton.textContent = "Show";
+  }
 }
 
 /*******************************************************

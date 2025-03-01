@@ -57,12 +57,15 @@ def chat_message():
     if history_key not in session:
         session[history_key] = []
     if "performance" not in session:
-        session["performance"] = {"hints": 0, "errors": 0, "time_taken": 0, "behavioral_traits": []}
+        session["performance"] = {"hints": 0, "errors": 0, "time_taken": 0, "behavioral_traits": [], "hints_given": 0}
 
     if not user_message and not code_to_analyze:
         return jsonify({"response": "Hey, let’s get started! What do you want to do?"})
 
-    session[history_key].append({"role": "user", "content": user_message if user_message else "(Code analysis requested)"})
+    # Only store significant user messages
+    if not ("hint" in user_message.lower() or "Technical: yes" in user_message):
+        session[history_key].append({"role": "user", "content": user_message if user_message else "(Code analysis requested)"})  # Fixed syntax error here
+
     context = "Technical"
     if "Behavioral:" in user_message:
         context = "Behavioral"
@@ -71,10 +74,23 @@ def chat_message():
         context = "CodeAnalysis"
 
     if context == "Technical":
+        # Track number of hints given
+        hint_count = session["performance"].get("hints_given", 0)
+        provide_solution = False
+
+        # Check if user explicitly requests the solution after hints
+        if ("provide the code" in user_message.lower() or "give me the solution" in user_message.lower()):
+            if hint_count >= 2:  # Only provide solution after at least 2 hints
+                provide_solution = True
+            else:
+                user_message += f" (Please provide a hint first, as you've only received {hint_count} hints so far.)"
+
         system_prompt = (
             "You are a professional coding interview assistant acting as an interviewer. Your role is to guide the user through the coding challenge specified in the 'Current Challenge' below. "
             "Focus strictly on the challenge provided in the 'Current Challenge' context and do not introduce or discuss other challenges. "
-            "Provide clear, concise answers to user queries, offer hints if asked, and solve coding challenges with explanations when requested. "
+            "Do NOT provide the full solution or code directly unless the user explicitly requests it after receiving at least 2 hints or indicates they cannot proceed further (e.g., 'I’m stuck, please provide the solution'). "
+            "Instead, offer hints, ask probing questions to encourage problem-solving (e.g., 'How would you approach this?', 'Have you considered edge cases?', 'What data structure might help here?'), and provide step-by-step guidance. "
+            "When providing feedback on code execution, explicitly state if the code is correct (e.g., 'The code is correct, well done!') or incorrect (e.g., 'The code is incorrect: [error description]'). "
             "Always ask follow-up questions to engage the user (e.g., 'Would you like a hint?', 'How would you approach this?', 'Would you like to optimize this further?'). "
             "If the user says something unrelated (e.g., greetings like 'hi'), respond politely and steer them back to the challenge. "
             "Maintain an encouraging tone and act as a mentor, helping the user succeed in the challenge.\n\n"
@@ -116,6 +132,14 @@ def chat_message():
         logger.error(f"Error generating message: {str(e)}")
         bot_reply = "Sorry, I couldn’t generate a response due to a technical issue. Let’s continue with the challenge!"
 
+    if context == "Technical":
+        if "hint" in user_message.lower():
+            session["performance"]["hints"] = session["performance"].get("hints", 0) + 1
+            session["performance"]["hints_given"] = session["performance"].get("hints_given", 0) + 1
+        # Only store significant bot replies
+        if not ("hint" in bot_reply.lower() or "The code is correct" in bot_reply or "The code is incorrect" in bot_reply):
+            session[history_key].append({"role": "assistant", "content": bot_reply})
+
     if context == "Behavioral":
         if "confidence" in bot_reply.lower() or "positive" in bot_reply.lower():
             session["performance"]["behavioral_traits"] = session.get("performance", {}).get("behavioral_traits", []) + ["Confident"]
@@ -123,8 +147,8 @@ def chat_message():
             session["performance"]["behavioral_traits"] = session.get("performance", {}).get("behavioral_traits", []) + ["Team Player"]
         if "elaborate" in bot_reply.lower() or "clarity" in bot_reply.lower():
             session["behavioral_feedback"] = session.get("behavioral_feedback", []) + [f"Hint provided: {bot_reply}"]
+        session[history_key].append({"role": "assistant", "content": bot_reply})
 
-    session[history_key].append({"role": "assistant", "content": bot_reply})
     session.modified = True
     return jsonify({"response": bot_reply})
 
@@ -145,7 +169,7 @@ def analyze_results():
 
     logger.debug(f"Request data - Overall Score: {overall_score}, Category Scores: {category_scores}, Time Taken: {time_taken}, Hints Used: {hints_used}, Errors Made: {errors_made}")
 
-    # Fallback analysis (always defined to ensure a response)
+    # Fallback analysis
     analysis = (
         "- Overall Performance: Your score of {}/30 indicates areas for improvement.\n"
         "- MCQ Performance: You scored {}/10 in MCQs. Consider reviewing fundamental programming concepts to improve your foundational knowledge.\n"
@@ -157,7 +181,7 @@ def analyze_results():
     ).format(
         overall_score,
         category_scores.get('MCQs', 0),
-        category_scores.get('Coding', 0),
+        category_scores.get('Coding', 0) / 2,  # Normalize to match frontend display
         category_scores.get('Behavioral', 0),
         time_taken,
         hints_used,
@@ -178,7 +202,7 @@ def analyze_results():
                 "Keep the tone supportive, professional, and encouraging, and format the response as a list of bullet points starting with '- '.\n\n"
                 "Performance Data:\n"
                 f"- Overall Score: {overall_score}/30\n"
-                f"- Category Scores: MCQs: {category_scores.get('MCQs', 0)}/10, Coding: {category_scores.get('Coding', 0)}/10, Behavioral: {category_scores.get('Behavioral', 0)}/10\n"
+                f"- Category Scores: MCQs: {category_scores.get('MCQs', 0)}/10, Coding: {category_scores.get('Coding', 0)}/20, Behavioral: {category_scores.get('Behavioral', 0)}/10\n"
                 f"- Time Taken: {time_taken} minutes\n"
                 f"- Hints Used: {hints_used}\n"
                 f"- Errors Made: {errors_made}\n"
@@ -203,20 +227,16 @@ def analyze_results():
             analysis = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
             analysis = analysis.replace("<|endoftext|>", "").strip()
 
-            # Ensure bullet point format
             if not analysis.startswith("- "):
                 analysis = "- " + analysis.replace("\n", "\n- ")
             logger.debug(f"AI analysis generated: {analysis}")
             return analysis
 
-        # Run the inference with timeout
         analysis = run_inference()
 
     except Exception as e:
         logger.error(f"Error in analyze_results: {str(e)}\n{traceback.format_exc()}")
-        # Fallback analysis is already defined above, no need to redefine
 
-    # Split the analysis into bullet points and ensure proper formatting
     analysis_points = [point.strip() for point in analysis.split('\n') if point.strip()]
     analysis = '\n'.join(analysis_points)
     logger.info(f"Returning analysis: {analysis}")
@@ -229,7 +249,6 @@ def evaluate_code_response():
     data = request.get_json() or {}
     bot_response = data.get("bot_response", "")
 
-    # Default score
     score = 4  # Neutral score if AI fails
 
     try:
@@ -264,7 +283,6 @@ def evaluate_code_response():
 
     except Exception as e:
         logger.error(f"Error in evaluate_code_response: {str(e)}\n{traceback.format_exc()}")
-        # Fallback score based on simple keyword analysis
         if "well done" in bot_response.lower() or "correct" in bot_response.lower():
             score = 8
         elif "error" in bot_response.lower() or "incorrect" in bot_response.lower():
@@ -316,7 +334,6 @@ def adjust_score_for_time():
 
     except Exception as e:
         logger.error(f"Error in adjust_score_for_time: {str(e)}\n{traceback.format_exc()}")
-        # Fallback adjustment based on time taken
         if time_taken < 30:
             adjusted_score = min(current_score + 2, 10)  # Bonus for fast completion
         elif time_taken > 60:
