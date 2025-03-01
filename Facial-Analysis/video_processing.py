@@ -1,12 +1,13 @@
 import cv2
-import mediapipe as mp
-from deepface import DeepFace
-
-# Initialize Face Detection
-mp_face_detection = mp.solutions.face_detection
-face_detection = mp_face_detection.FaceDetection()
 
 def process_video(results):
+    import mediapipe as mp
+    from deepface import DeepFace
+
+    # Initialize Face Detection
+    mp_face_detection = mp.solutions.face_detection
+    face_detection = mp_face_detection.FaceDetection()
+
     cap = cv2.VideoCapture(0)
     frame_interval = 5  
     frame_count = 0
