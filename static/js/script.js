@@ -6,10 +6,164 @@ let answeredCount = 0;
 window.twoChallenges = [];
 let mediaRecorder;        // Added for Behavioral Round recording
 let recordedBlobs = [];   // Added for Behavioral Round recording
+let isAuthenticated = false; // Track authentication status
 
 // Track the start time when the interview begins
 if (!sessionStorage.getItem("start_time")) {
     sessionStorage.setItem("start_time", Date.now().toString());
+}
+
+/*******************************************************
+ * Authentication Functions
+ *******************************************************/
+async function checkAuth() {
+    try {
+        const response = await fetch("/api/check_auth");
+        const data = await response.json();
+        if (response.ok && data.authenticated) {
+            isAuthenticated = true;
+            document.getElementById("user-status").innerText = `Logged in as: ${data.username}`;
+            document.getElementById("logout-btn").style.display = "inline-block";
+            updateDashboardContent(true);
+            updateSidebarLinks(true);
+            showScreen("dashboard");
+        } else {
+            isAuthenticated = false;
+            document.getElementById("user-status").innerText = "Not logged in";
+            document.getElementById("logout-btn").style.display = "none";
+            updateDashboardContent(false);
+            updateSidebarLinks(false);
+            showScreen("login-screen");
+        }
+    } catch (error) {
+        console.error("Check auth error:", error);
+        document.getElementById("auth-error").innerText = `Error checking auth: ${error.message}`;
+        isAuthenticated = false;
+        updateDashboardContent(false);
+        updateSidebarLinks(false);
+        showScreen("login-screen");
+    }
+}
+
+function checkAuthAndNavigate(screenId) {
+    if (isAuthenticated) {
+        showScreen(screenId);
+    } else {
+        alert("Please log in to access this round.");
+        showScreen("login-screen");
+    }
+}
+
+function updateSidebarLinks(isLoggedIn) {
+    const round1Link = document.getElementById("round1-link");
+    const round2Link = document.getElementById("round2-link");
+    const round3Link = document.getElementById("round3-link");
+
+    if (isLoggedIn) {
+        round1Link.classList.remove("disabled-link");
+        round2Link.classList.remove("disabled-link");
+        round3Link.classList.remove("disabled-link");
+        round1Link.style.pointerEvents = "auto";
+        round2Link.style.pointerEvents = "auto";
+        round3Link.style.pointerEvents = "auto";
+    } else {
+        round1Link.classList.add("disabled-link");
+        round2Link.classList.add("disabled-link");
+        round3Link.classList.add("disabled-link");
+        round1Link.style.pointerEvents = "none";
+        round2Link.style.pointerEvents = "none";
+        round3Link.style.pointerEvents = "none";
+    }
+}
+
+function updateDashboardContent(isLoggedIn) {
+    const dashboardContent = document.getElementById("dashboard-content");
+    if (isLoggedIn) {
+        dashboardContent.innerHTML = `
+            <p>Welcome to your AI Interview Assistant. You can begin your interview below.</p>
+            <button class="btn" onclick="startInterview()">Start Interview</button>
+        `;
+    } else {
+        dashboardContent.innerHTML = `
+            <p>Please sign up or log in to start the interview.</p>
+            <div class="nav-buttons">
+                <button class="btn" onclick="showScreen('signup-screen')">Sign Up</button>
+                <button class="btn" onclick="showScreen('login-screen')">Log In</button>
+            </div>
+        `;
+    }
+}
+
+function startInterview() {
+    if (isAuthenticated) {
+        showScreen("round1");
+    } else {
+        alert("Please log in to start the interview.");
+        showScreen("login-screen");
+    }
+}
+
+async function signup() {
+    const username = document.getElementById("signup-username").value;
+    const email = document.getElementById("signup-email").value;
+    const password = document.getElementById("signup-password").value;
+    const errorElement = document.getElementById("signup-error");
+
+    errorElement.innerText = ""; // Clear previous errors
+
+    try {
+        const response = await fetch("/api/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, email, password })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Signup failed");
+        alert("Signup successful! Please log in.");
+        showScreen("login-screen");
+    } catch (error) {
+        console.error("Signup error:", error);
+        errorElement.innerText = `Error: ${error.message}`;
+    }
+}
+
+async function login() {
+    const username = document.getElementById("login-username").value;
+    const password = document.getElementById("login-password").value;
+    const errorElement = document.getElementById("login-error");
+
+    errorElement.innerText = ""; // Clear previous errors
+
+    try {
+        const response = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Login failed");
+        alert("Login successful!");
+        checkAuth(); // Update UI after login
+    } catch (error) {
+        console.error("Login error:", error);
+        errorElement.innerText = `Error: ${error.message}`;
+    }
+}
+
+async function logout() {
+    try {
+        const response = await fetch("/api/logout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Logout failed");
+        alert("Logout successful!");
+        checkAuth(); // Update UI after logout
+    } catch (error) {
+        console.error("Logout error:", error);
+        document.getElementById("auth-error").innerText = `Error: ${error.message}`;
+    }
 }
 
 /*******************************************************
@@ -55,6 +209,7 @@ async function fetchMCQs() {
     const container = document.getElementById("mcq-container");
     const progressLabel = document.getElementById("mcq-progress");
     const errorElement = document.getElementById("mcq-error");
+    const submitButton = document.querySelector("#round1 .btn");
 
     // Show loading state
     container.innerHTML = `
@@ -64,6 +219,7 @@ async function fetchMCQs() {
         </div>
     `;
     errorElement.innerText = ""; // Clear previous errors
+    submitButton.disabled = true; // Disable submit button initially
 
     try {
         const response = await fetch("/api/get_general_qs");
@@ -121,14 +277,20 @@ async function fetchMCQs() {
 function updateAnsweredCount() {
     const container = document.getElementById("mcq-container");
     const mcqItems = container.querySelectorAll(".mcq-item");
+    const submitButton = document.querySelector("#round1 .btn");
     let count = 0;
+
     mcqItems.forEach(item => {
         const qid = item.getAttribute("data-id");
         const selected = item.querySelector(`input[name="mcq-${qid}"]:checked`);
         if (selected) count++;
     });
+
     answeredCount = count;
     updateMCQProgress();
+
+    // Enable/disable submit button based on answered count
+    submitButton.disabled = answeredCount < 5;
 }
 
 function updateMCQProgress() {
@@ -148,6 +310,9 @@ async function submitMCQs() {
     let answers = [];
 
     errorElement.innerText = ""; // Clear previous errors
+
+    // Slight delay to ensure DOM updates are reflected
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Collect answers from the DOM
     mcqItems.forEach(item => {
@@ -982,3 +1147,8 @@ function toggleSidebar() {
     const sidebar = document.getElementById("sidebar");
     sidebar.classList.toggle("collapsed");
 }
+
+// Check auth on page load
+document.addEventListener("DOMContentLoaded", () => {
+    checkAuth();
+});

@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>AI Interview Assistant (Single Page with Chat)</title>
+  <title>AI Interview Assistant</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-  <!-- Include Chart.js for graphs -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -13,21 +12,57 @@
     <h2 class="logo">MOCK AI INTERVIEW</h2>
     <ul class="nav-links">
       <li><a href="#" onclick="showScreen('dashboard')">Dashboard</a></li>
-      <li><a href="#" onclick="showScreen('round1')">Round 1 (MCQs)</a></li>
-      <li><a href="#" onclick="showScreen('round2_challenge1')">Round 2 (Coding)</a></li>
-      <li><a href="#" onclick="showScreen('round3')">Round 3 (Behavioral)</a></li>
+      <li><a href="#" id="round1-link" onclick="checkAuthAndNavigate('round1')">Round 1 (MCQs)</a></li>
+      <li><a href="#" id="round2-link" onclick="checkAuthAndNavigate('round2_challenge1')">Round 2 (Coding)</a></li>
+      <li><a href="#" id="round3-link" onclick="checkAuthAndNavigate('round3')">Round 3 (Behavioral)</a></li>
       <li><a href="#" onclick="showScreen('results')">Results</a></li>
     </ul>
   </div>
 
   <!-- Main Content -->
   <div class="main-content">
+    <!-- User Status -->
+    <div class="user-status">
+      <span id="user-status">Checking auth...</span>
+      <button id="logout-btn" class="btn" style="display: none;" onclick="logout()">Logout</button>
+      <div id="auth-error" class="error"></div>
+    </div>
+
+    <!-- Authentication Screen: Signup -->
+    <div id="signup-screen" class="screen">
+      <div class="auth-container">
+        <h1>Sign Up</h1>
+        <div class="auth-form">
+          <input type="text" id="signup-username" placeholder="Username" required>
+          <input type="email" id="signup-email" placeholder="Email" required>
+          <input type="password" id="signup-password" placeholder="Password" required>
+          <button class="btn auth-btn" onclick="signup()">Sign Up</button>
+          <div id="signup-error" class="error"></div>
+          <p class="auth-toggle">Already have an account? <a href="#" onclick="showScreen('login-screen')">Log in</a></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Authentication Screen: Login -->
+    <div id="login-screen" class="screen active">
+      <div class="auth-container">
+        <h1>Login</h1>
+        <div class="auth-form">
+          <input type="text" id="login-username" placeholder="Username" required>
+          <input type="password" id="login-password" placeholder="Password" required>
+          <button class="btn auth-btn" onclick="login()">Login</button>
+          <div id="login-error" class="error"></div>
+          <p class="auth-toggle">Don't have an account? <a href="#" onclick="showScreen('signup-screen')">Sign up</a></p>
+        </div>
+      </div>
+    </div>
 
     <!-- 1) Dashboard Screen -->
-    <div id="dashboard" class="screen active">
+    <div id="dashboard" class="screen">
       <h1>Dashboard</h1>
-      <p>Welcome to your AI Interview Assistant. You can begin your interview below.</p>
-      <button class="btn" onclick="showScreen('round1')">Start Interview</button>
+      <div id="dashboard-content">
+        <!-- Content will be updated dynamically based on auth status -->
+      </div>
     </div>
 
     <!-- 2) Round 1: MCQs -->
@@ -40,7 +75,7 @@
         <p>Loading MCQs...</p>
       </div>
       <div id="mcq-error" class="error"></div>
-      <button class="btn" onclick="submitMCQs()">Submit Answers</button>
+      <button class="btn" onclick="submitMCQs()" disabled>Submit Answers</button>
     </div>
 
     <!-- 3) Round 2: Challenge 1 -->
@@ -132,19 +167,19 @@
     <div id="round3" class="screen">
       <h1>Round 3: Behavioral Interview</h1>
       <div class="question-card" id="behavioral-question">
-        <h3>Question</h3>
+        <h3>Question 1/5</h3>
         <p>Loading...</p>
       </div>
       <div class="recording-container">
         <video id="video-preview" width="320" height="240" autoplay muted></video>
         <audio id="audio-preview" style="display:none;"></audio>
-        <button class="btn" id="start-recording">Start Recording</button>
+        <button class="btn" id="start-recording" disabled>Start Recording</button>
         <button class="btn" id="stop-recording" disabled>Stop Recording</button>
       </div>
       <div class="feedback-container" id="behavioral-feedback">
         <h4>Feedback</h4>
         <ul id="feedback-list"></ul>
-        <p><strong>Next Question:</strong> <span id="follow-up-question"></span></p>
+        <p><strong>Next Question or Summary:</strong> <span id="follow-up-question"></span></p>
       </div>
       <div class="nav-buttons">
         <button class="btn" onclick="showScreen('results')">Finish Interview</button>
