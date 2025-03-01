@@ -1,0 +1,10 @@
+flask
+opencv-python
+mediapipe
+deepface
+whisper
+numpy
+pyaudio
+torch
+transformers
+accelerate
