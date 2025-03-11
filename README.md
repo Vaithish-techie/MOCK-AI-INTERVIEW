@@ -1,110 +1,135 @@
-A web-based platform for simulating technical interviews. The application integrates multiple rounds—including MCQs and coding challenges—with real-time code execution and AI-powered code analysis. This tool is designed to help candidates prepare for technical interviews in a professional, interactive environment.
+# Mock AI Interview
 
-Features
-Round 1: Technical MCQs
-Randomly fetches and displays 5–10 MCQs from a seeded database.
-Real-time progress tracking and immediate feedback upon submission.
+Mock AI Interview is a web-based platform designed to simulate technical interview rounds, including MCQs and coding challenges. The platform features real-time code execution and AI-powered analysis to help candidates prepare effectively in an interactive environment.
 
-Round 2: Coding Challenge
-Retrieves 2 balanced coding challenges from the database (e.g., one easy and one hard, or two medium problems).
-Provides a large code editor for each challenge.
-Supports code execution (via Judge0 API or a local alternative) with output displayed.
-Offers AI-powered code analysis (using OpenAI or local models) with results shown alongside output.
+## Features
 
-Final Report
-Displays performance graphs, achievement badges, and a leaderboard (if multiplayer mode is enabled).
-Provides detailed analysis and a transcript of the interview session.
-Responsive & Interactive UI
+### Round 1: Technical MCQs
+- Randomly fetches 5–10 MCQs from a seeded database.
+- Real-time progress tracking and instant feedback.
 
-Modern dark theme with professional styling.
-Clear visual separation between different rounds and interactive elements like hover effects.
+### Round 2: Coding Challenge
+- Retrieves 2 coding challenges (balanced difficulty levels).
+- Integrated code editor for solving challenges.
+- Supports real-time code execution via Judge0 API.
+- AI-powered code analysis with feedback.
 
-Technologies Used
-Backend: Python, Flask, Flask-SQLAlchemy, Flask-Cors
-Database: PostgreSQL
-APIs: Judge0 for code execution, OpenAI (or local alternatives) for AI analysis
-Frontend: HTML, CSS, JavaScript, Chart.js (for final report graphs)
-Deployment: (Local development; can be extended to AWS, Docker, etc.)
+### Final Report
+- Performance summary with graphs and achievement badges.
+- Leaderboard support (if multiplayer mode is enabled).
+- Detailed analysis and session transcript.
 
-Project Structure
+### UI & Design
+- Modern dark-themed interface.
+- Intuitive layout with interactive elements.
+
+## Technologies Used
+
+- **Backend:** Python, Flask, Flask-SQLAlchemy, Flask-CORS
+- **Database:** PostgreSQL
+- **APIs:** Judge0 (code execution)
+- **LLM:** Mistral‑7B‑Instruct‑v0.1 (via Transformers & BitsAndBytes for 4-bit quantization)
+- **Frontend:** HTML, CSS, JavaScript, Chart.js (for report graphs)
+- **Deployment:** Local development (extendable to AWS, Docker, etc.)
+
+## Project Structure
+
+```
 Mock-AI-Interview/
-├── .env.example                # Example environment variables file
-├── .gitignore                  # Specifies files and directories to ignore
-├── README.md                   # This file
-├── requirements.txt            # Python dependencies
-├── app.py                      # Flask application entry point
-├── config.py                   # Application configuration (loads .env)
-├── extensions.py               # Flask extensions initialization (e.g., SQLAlchemy)
-├── models.py                   # Database models (MCQs, Coding Questions, etc.)
-├── seed.py                     # Script to seed the database with questions
-├── routes/
-│   ├── __init__.py
-│   ├── rounds.py               # API endpoints for MCQs (Round 1)
-│   ├── external_coding.py      # API endpoint for balanced coding challenges (Round 2)
-│   ├── execution.py            # API endpoint for code execution
-│   └── ai_feedback.py          # API endpoint for AI-powered code analysis
-├── static/
-│   ├── css/
-│   │   └── styles.css          # CSS for the frontend
-│   └── js/
-│       └── script.js           # JavaScript for UI interactions & API calls
+├── .env.example        # Sample environment variables
+├── .gitignore          # Git ignore list
+├── README.md           # Project documentation
+├── requirements.txt    # Python dependencies
+├── app.py              # Application entry point
+├── config.py           # Configuration settings
+├── extensions.py       # Flask extensions setup
+├── models.py           # Database models
+├── seed.py             # Script to populate database
+├── routes/             # API endpoints
+│   ├── rounds.py       # MCQ handling (Round 1)
+│   ├── external_coding.py  # Coding challenges (Round 2)
+│   ├── results.py    # For real-time results
+│   ├── execution.py    # Code execution via Judge0
+│   ├── behavioral.py    # For behavioral round
+│   ├── chat.py    # Backend for chatbot with LLM integration
+│   ├── signup.py    # For login in page
+|   └── ai_feedback.py  # AI analysis
+├── static/             # Frontend assets
+│   ├── css/styles.css  # Stylesheet
+│   └── js/script.js    # UI interactions
 └── templates/
-    └── index.html              # Single-page HTML for the UI
+    └── index.html      # Web interface
+```
 
-Installation and Setup
-Clone the Repository
+## Installation & Setup
+
+### Clone the Repository
+```sh
 git clone https://github.com/yourusername/Mock-AI-Interview.git
 cd Mock-AI-Interview
-Create and Activate a Virtual Environment
+```
 
-On Windows (PowerShell):
+### Create & Activate Virtual Environment
+#### Windows (PowerShell)
+```sh
 python -m venv venv
 .\venv\Scripts\Activate
-
-On macOS/Linux:
+```
+#### macOS/Linux
+```sh
 python3 -m venv venv
 source venv/bin/activate
+```
 
-Install Dependencies
+### Install Dependencies
+```sh
 pip install -r requirements.txt
+```
 
-Configure Environment Variables
-Copy the .env.example file to .env:
+### Configure Environment Variables
+```sh
 cp .env.example .env
-Edit .env to include your secrets (e.g., SECRET_KEY, SQLALCHEMY_DATABASE_URI, JUDGE0_API_KEY, OPENAI_API_KEY).
+```
+Edit `.env` to set up credentials (SECRET_KEY, SQLALCHEMY_DATABASE_URI, JUDGE0_API_KEY, OPENAI_API_KEY).
 
-Set Up the Database
-Ensure PostgreSQL is running.
-Create a database (e.g., interview_db).
-Run the seed script to populate the database:
+### Set Up the Database
+- Ensure PostgreSQL is running.
+- Create a database (e.g., `interview_db`).
+- Seed the database:
+```sh
 python -m seed
+```
 
-Run the Application
+### Run the Application
+```sh
 python -m app
-Open your browser and navigate to http://127.0.0.1:5000/.
+```
+Visit [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your browser.
 
-Usage
-Dashboard:
-Landing page with navigation options for each round.
+## Usage
 
-Round 1 (MCQs):
-Answer a set of technical MCQs. Your progress is tracked, and you receive feedback upon submission.
+### Dashboard
+- Navigate between different interview rounds.
 
-Round 2 (Coding Challenges):
-Two coding challenges are displayed with the question on the left and a large code editor on the right.
-Click "Run Code" to execute your solution and see the output.
-Click "AI Analysis" to receive automated code analysis feedback.
+### Round 1 (MCQs)
+- Answer a set of technical MCQs.
+- Receive real-time feedback.
 
-Final Report:
-View your performance summary, including performance graphs, achievement badges, and a leaderboard.
+### Round 2 (Coding Challenges)
+- Solve coding problems using the integrated editor.
+- Click **"Run Code"** to execute solutions.
+- Click **"AI Analysis"** for automated feedback.
+- Click **"Submit"** for code submission.
 
-Git and Environment Management
-.gitignore:
-The repository includes a .gitignore file to prevent committing:
-Virtual environment directories (e.g., venv/, Lib/, Scripts/, etc.)
-Environment variable files (.env)
-Cache files (__pycache__/, *.pyc)
-Other system-specific or IDE files
+### Final Report
+- View performance analytics.
+- Access a detailed session transcript.
 
-Environment Variables:
-We use python-dotenv to load configuration from a .env file. Do not commit your actual .env file; instead, use .env.example as a template.
+## Git & Environment Management
+
+- **`.gitignore`** prevents committing sensitive files (e.g., `.env`, `pycache/`, virtual environments).
+- **Environment Variables:** Managed using `python-dotenv`. Use `.env.example` as a reference; do not commit `.env`.
+
+---
+This project provides a structured and interactive approach to technical interview preparation. Future enhancements may include additional AI capabilities, extended question banks, and multiplayer interview simulations.
+
